@@ -15,7 +15,6 @@ class ErrorCode(IntEnum):
     LLM_UNCONFIGURED = 30001       # 大模型未配置
 
 
-
 class AppException(Exception):
     def __init__(
         self,
@@ -40,6 +39,7 @@ def error_payload(code: ErrorCode, message: str, detail: Any | None = None) -> d
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    # 捕获手动抛出的业务错误
     @app.exception_handler(AppException)
     async def handle_app_exception(
         request: Request,
@@ -49,7 +49,8 @@ def register_exception_handlers(app: FastAPI) -> None:
             status_code=exc.status_code,
             content=error_payload(exc.code, exc.message, exc.detail),
         )
-
+    
+    # 捕获 Pydantic 参数校验错误，返回 422 + 具体校验错误列表
     @app.exception_handler(RequestValidationError)
     async def handle_validation_exception(
         request: Request,
@@ -64,6 +65,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             ),
         )
 
+    # 捕获未预期的异常，返回 500 + 通用错误信息
     @app.exception_handler(Exception)
     async def handle_unexpected_exception(
         request: Request,
