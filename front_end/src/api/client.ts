@@ -4,6 +4,7 @@ import type {
   CompanyItem,
   HeatmapData,
   ArticleItem,
+  ArticleDetail,
 } from './types'
 
 // 把 ../mock/products.json 这个 JSON 文件当成一个模块导入，并赋值给变量 productsMock。
@@ -11,12 +12,13 @@ import productsMock from '../mock/products.json'
 import companiesMock from '../mock/companies.json'
 import trendsMock from '../mock/trends.json'
 import articlesMock from '../mock/articles.json'
+import articleDetailMock from '../mock/article_detail.json'
 
 // 切换开关：true = 使用 mock 数据，false = 调用真实后端
 const USE_MOCK = false
 
 // 真实后端基础地址
-const API_BASE = 'http://192.168.111.13:8000'
+const API_BASE = 'http://localhost:8000'
 
 async function fetchMock<T>(mockData: ApiResponse<T>): Promise<ApiResponse<T>> {
   // 模拟网络延迟
@@ -52,4 +54,9 @@ export async function getTrends(): Promise<ApiResponse<HeatmapData[]>> {
 export async function getArticles(): Promise<ApiResponse<ArticleItem[]>> {
   if (USE_MOCK) return fetchMock(articlesMock as ApiResponse<ArticleItem[]>)
   return fetchApi('/api/articles')
+}
+
+export async function getArticleDetail(id: number): Promise<ApiResponse<ArticleDetail>> {
+  if (USE_MOCK) return fetchMock(articleDetailMock as ApiResponse<ArticleDetail>)
+  return fetchApi(`/api/articles/${id}`)
 }

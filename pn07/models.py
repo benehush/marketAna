@@ -44,10 +44,24 @@ class LLMConfig:
 
 
 @dataclass
+class InferItem:
+    """单个品种的 LLM 推理结果。"""
+
+    product: str | None = None
+    contract: str | None = None
+    direction: str | None = None
+    reason: str = ""
+    confidence: float = 0.0
+    need_manual_review: bool = False
+
+
+@dataclass
 class InferResult:
     """LLM 推理结果。"""
 
+    results: list[InferItem] = field(default_factory=list)
     product: str | None = None
+    contract: str | None = None
     direction: str | None = None
     reason: str = ""
     confidence: float = 0.0
@@ -60,7 +74,17 @@ class InferResult:
 
     @property
     def ok(self) -> bool:
-        return self.product is not None and self.direction is not None
+        return bool(self.results) or (self.product is not None and self.direction is not None)
+
+    def __post_init__(self) -> None:
+        if self.results and self.product is None:
+            primary = max(self.results, key=lambda item: item.confidence)
+            self.product = primary.product
+            self.contract = primary.contract
+            self.direction = primary.direction
+            self.reason = primary.reason
+            self.confidence = primary.confidence
+            self.need_manual_review = any(item.need_manual_review for item in self.results)
 
     def summary(self) -> str:
         return (

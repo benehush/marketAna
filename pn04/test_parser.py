@@ -217,6 +217,75 @@ def test_html_parser_table_extraction(temp_dir):
     assert "| 螺纹钢 | 看涨 |" in result.raw_text
 
 
+def test_html_parser_selects_main_content_over_navigation(temp_dir):
+    """HTML 正文候选评分应避开导航/页脚，命中正文块。"""
+    html_content = """<!DOCTYPE html>
+<html><body>
+    <div class="nav">
+        <a>首页</a><a>走近公司</a><a>在线服务</a><a>下载APP</a>
+        <a>客服中心</a><a>上一篇</a><a>下一篇</a>
+    </div>
+    <div class="content">
+        <h1>铜市场日报</h1>
+        <p>沪铜价格震荡偏强，新能源需求保持韧性。</p>
+        <p>库存继续去化，现货升水支撑价格。</p>
+    </div>
+    <footer>客服电话 400-000-0000</footer>
+</body></html>"""
+    file_path = os.path.join(temp_dir, "main_content.html")
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(html_content)
+
+    from pn04.html_parser import HtmlParser
+
+    result = HtmlParser().parse(file_path)
+    assert "铜市场日报" in result.raw_text
+    assert "新能源需求保持韧性" in result.raw_text
+    assert "客服中心" not in result.raw_text
+
+
+def test_html_parser_extracts_embedded_report_image(temp_dir, monkeypatch):
+    """HTML 正文图片应进入 OCR 段，覆盖浙商长图类页面。"""
+    try:
+        from PIL import Image
+    except ImportError:
+        pytest.skip("Pillow 未安装")
+
+    image_dir = os.path.join(temp_dir, "img_folder")
+    os.makedirs(image_dir)
+    image_path = os.path.join(image_dir, "report.png")
+    Image.new("RGB", (900, 1200), "white").save(image_path)
+
+    html_content = """<!DOCTYPE html>
+<html><body>
+    <div class="conten conten_w">
+        <h2 class="con_tt">【L日报20250401】</h2>
+        <div class="con_p"><p><img src="img_folder/report.png" /></p></div>
+    </div>
+    <div class="about"><a>上一篇</a><a>下一篇</a></div>
+</body></html>"""
+    file_path = os.path.join(temp_dir, "zhe_report.html")
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(html_content)
+
+    from pn04.html_parser import HtmlParser
+    from pn04.image_parser import ImageParser
+
+    def fake_extract(self, path):
+        return ParseResult(
+            parser_type=ParserType.IMAGE,
+            raw_text="OCR正文：L日报包含现货价格、基差及盘面价差图表。",
+            metadata={"file_path": path},
+        )
+
+    monkeypatch.setattr(ImageParser, "extract_image_text", fake_extract)
+
+    result = HtmlParser().parse(file_path)
+    assert "## 图片OCR文本: img_folder/report.png" in result.raw_text
+    assert "OCR正文：L日报包含现货价格" in result.raw_text
+    assert "上一篇" not in result.raw_text
+
+
 def test_html_parser_file_not_found():
     """HTML 文件不存在时抛出异常。"""
     from pn04.html_parser import HtmlParser
@@ -285,6 +354,34 @@ def test_image_parser_unsupported_format(temp_dir):
     parser = ImageParser()
     with pytest.raises(FileReadError):
         parser.parse(file_path)
+
+
+def test_image_parser_slices_tall_images(temp_dir, monkeypatch):
+    """长图 OCR 应按高度切片并按顺序拼接。"""
+    try:
+        from PIL import Image
+    except ImportError:
+        pytest.skip("Pillow 未安装")
+
+    file_path = os.path.join(temp_dir, "long.png")
+    Image.new("RGB", (900, 3800), "white").save(file_path)
+
+    from pn04.image_parser import ImageParser
+
+    monkeypatch.setattr(ImageParser, "_ensure_supported_engine", lambda self: None)
+
+    def fake_ocr(self, image, *, file_path):
+        width, height = image.size
+        return f"slice {width}x{height}"
+
+    monkeypatch.setattr(ImageParser, "_ocr_pil_image", fake_ocr)
+
+    parser = ImageParser(ParseConfig(image_slice_height=1000))
+    result = parser.extract_image_text(file_path)
+
+    assert "[图片分片 1/4]" in result.raw_text
+    assert "[图片分片 4/4]" in result.raw_text
+    assert "slice 900x800" in result.raw_text
 
 
 # ---- 主解析器 parse_article 集成测试 ----
@@ -418,4 +515,9 @@ def test_parse_config_defaults():
     assert config.ocr_lang == "chi_sim+eng"
     assert config.pdf_ocr_fallback is True
     assert config.extract_tables is True
+    assert config.html_extract_embedded_images is True
+    assert config.image_ocr_engine == "tesseract"
+    assert config.parser_ai_enabled is False
+    assert config.parser_ai_max_images == 3
+    assert config.min_meaningful_text_chars == 200
     assert config.max_text_length == 500_000

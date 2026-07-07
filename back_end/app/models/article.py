@@ -89,10 +89,9 @@ class Article(Base):
         cascade="all, delete-orphan",  # 级联删除，删除文章时同时删除关联的文本记录
         uselist=False,                 # 一对一
     )
-    analysis_result: Mapped[Optional["AnalysisResult"]] = relationship(
+    analysis_results: Mapped[list["AnalysisResult"]] = relationship(
         back_populates="article",
         cascade="all, delete-orphan",
-        uselist=False,
     )
     task_logs: Mapped[list["TaskLog"]] = relationship(
         back_populates="article",
@@ -102,6 +101,20 @@ class Article(Base):
         back_populates="article",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def analysis_result(self) -> Optional["AnalysisResult"]:
+        """Backward-compatible primary analysis result."""
+        if not self.analysis_results:
+            return None
+        primary = [result for result in self.analysis_results if result.is_primary]
+        if primary:
+            return sorted(primary, key=lambda item: item.id or 0)[0]
+        return sorted(
+            self.analysis_results,
+            key=lambda item: (item.confidence or 0.0, -(item.id or 0)),
+            reverse=True,
+        )[0]
 
 
 class ArticleText(Base):
@@ -142,8 +155,8 @@ class AnalysisResult(Base):
     """分析结果表 - 存储 LLM 或规则引擎对文章的市场分析结论。"""
     __tablename__ = "analysis_results"
     __table_args__ = (
-        # 一篇文章只能有一条分析结果
-        UniqueConstraint("article_id", name="uq_analysis_results_article_id"),
+        # 一篇文章可对应多个品种/合约结果，同一品种合约保持当前有效结果唯一
+        UniqueConstraint("article_id", "product", "contract_key", name="uq_analysis_results_article_product_contract"),
         # 方向字段必须在合法枚举值内
         CheckConstraint(
             f"direction in {DIRECTION_VALUES}",
@@ -173,11 +186,18 @@ class AnalysisResult(Base):
         index=True,
     )
     product: Mapped[str] = mapped_column(String(128), nullable=False)       # 关联产品名称
+    contract: Mapped[str | None] = mapped_column(String(64), nullable=True) # 合约，如 05、2505
+    contract_key: Mapped[str] = mapped_column(String(64), nullable=False, default="") # 合约归一化键
     direction: Mapped[str] = mapped_column(String(16), nullable=False)      # 市场方向：看涨/看跌/中性
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)         # 分析理由
     confidence: Mapped[float] = mapped_column(Float, nullable=False)        # 置信度（0~1）
     analysis_method: Mapped[str] = mapped_column(String(32), nullable=False) # 分析方法（rule/llm/manual）
     need_manual_review: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 是否需要人工复核
+    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 是否为文章主结果
+    model_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    llm_duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    llm_retry_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    llm_error_msg: Mapped[str | None] = mapped_column(Text, nullable=True)
     analysis_time: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
@@ -195,7 +215,7 @@ class AnalysisResult(Base):
         onupdate=func.now(),
     )
     # 关联Article表的analysis_result属性，建立一对一关系
-    article: Mapped[Article] = relationship(back_populates="analysis_result")
+    article: Mapped[Article] = relationship(back_populates="analysis_results")
 
 
 class TaskLog(Base):

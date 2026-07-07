@@ -10,12 +10,15 @@ from __future__ import annotations
 SYSTEM_PROMPT = """你是一位资深期货市场分析师。请从以下期货研究报告文本中提取关键信息，并以 JSON 格式输出分析结果。
 
 规则：
-1. product: 涉及的期货品种名称（如螺纹钢、沪铜、豆粕、铁矿石、原油等）。如果文本提到多个品种，选择最主要讨论的那个。
-2. direction: 走势预测，必须是"看涨"、"看跌"或"中性"之一。
-3. reason: 支撑该判断的核心理由，控制在100字以内，引用文本中的关键信息。
-4. confidence: 你对该判断的置信度(0.0-1.0)。明确信号>0.8，模糊信号<0.5，不确定时给低分。
+1. 输出一个 results 数组；每个元素对应一个明确期货品种或品种+合约观点。
+2. product: 品种名称；contract: 合约（没有则为空字符串）。
+3. direction: 走势预测，必须是"看涨"、"看跌"或"中性"之一。
+4. reason: 支撑该判断的核心理由，控制在120字以内，引用文本中的关键信息。
+5. confidence: 你对该判断的置信度(0.0-1.0)。明确信号>0.8，模糊信号<0.5，不确定时给低分。
+6. 如果文本提到多个品种，请输出多条结果；不要把不同品种的方向混合成一条。
 
-只输出 JSON，不要添加任何解释或额外文本。"""
+只输出 JSON，不要添加任何解释或额外文本。
+格式：{"results":[{"product":"","contract":"","direction":"看涨/看跌/中性","reason":"","confidence":0.0}]}"""
 
 
 def build_messages(
@@ -26,6 +29,7 @@ def build_messages(
     company: str = "",
     publish_time: str = "",
     max_input_chars: int = 8000,
+    rule_candidates: list[dict] | None = None,
 ) -> list[dict]:
     """
     构建 LLM messages。
@@ -54,6 +58,17 @@ def build_messages(
         meta_parts.append(f"发布时间：{publish_time}")
     if meta_parts:
         parts.append(" | ".join(meta_parts))
+
+    if rule_candidates:
+        lines = []
+        for item in rule_candidates:
+            lines.append(
+                f"- {item.get('product') or '未知'} "
+                f"{item.get('contract') or ''} "
+                f"{item.get('direction') or '未定'} "
+                f"confidence={float(item.get('confidence') or 0):.2f}"
+            )
+        parts.append("规则引擎候选（请保留高置信结果，补全低置信或遗漏品种）：\n" + "\n".join(lines))
 
     # 正文（可能截断）
     if len(cleaned_text) > max_input_chars:

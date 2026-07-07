@@ -22,8 +22,10 @@ function buildOption() {
     valueMap.set(`${item.product}-${item.date}`, item.value)
   }
   for (let i = 0; i < products.length; i++) {
+    const row = matrix[i]
+    if (!row) continue
     for (let j = 0; j < dates.length; j++) {
-      matrix[i][j] = valueMap.get(`${products[i]}-${dates[j]}`) ?? 0
+      row[j] = valueMap.get(`${products[i]}-${dates[j]}`) ?? 0
     }
   }
 

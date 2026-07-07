@@ -36,13 +36,82 @@
       "id": 3,
       "article_id": 3,
       "product": "沪铜",
+      "contract": null,
+      "contract_key": "",
       "direction": "看涨",
       "reason": "新能源需求拉动，铜矿供给偏紧，中期看涨",
       "confidence": 0.7,
       "analysis_method": "rule",
       "need_manual_review": false,
-      "analysis_time": "2026-06-15T10:04:00"
+      "is_primary": true,
+      "model_name": null,
+      "llm_duration_ms": null,
+      "llm_retry_count": null,
+      "llm_error_msg": null,
+      "analysis_time": "2026-06-15T10:04:00",
+      "evidence": {
+        "summary": "新能源需求拉动，铜矿供给偏紧，中期看涨",
+        "source": "cleaned_text",
+        "excerpts": [
+          {
+            "quote": "全球铜矿产能增长有限，新能源领域铜需求持续增长。供给端：全球主要铜矿产量增长乏力，新项目建设周期长，2026年全球铜矿供给预计仅增长2%。",
+            "source": "cleaned_text",
+            "start_char": 0,
+            "end_char": 72,
+            "match_type": "keyword"
+          },
+          {
+            "quote": "观点：中期看涨沪铜，目标价位80000元/吨。",
+            "source": "cleaned_text",
+            "start_char": 143,
+            "end_char": 167,
+            "match_type": "reason"
+          }
+        ],
+        "notes": "由 reason 在清洗文本中定位"
+      }
     },
+    "analysis_results": [
+      {
+        "id": 3,
+        "article_id": 3,
+        "product": "沪铜",
+        "contract": null,
+        "contract_key": "",
+        "direction": "看涨",
+        "reason": "新能源需求拉动，铜矿供给偏紧，中期看涨",
+        "confidence": 0.7,
+        "analysis_method": "rule",
+        "need_manual_review": false,
+        "is_primary": true,
+        "model_name": null,
+        "llm_duration_ms": null,
+        "llm_retry_count": null,
+        "llm_error_msg": null,
+        "analysis_time": "2026-06-15T10:04:00",
+        "evidence": {
+          "summary": "新能源需求拉动，铜矿供给偏紧，中期看涨",
+          "source": "cleaned_text",
+          "excerpts": [
+            {
+              "quote": "全球铜矿产能增长有限，新能源领域铜需求持续增长。供给端：全球主要铜矿产量增长乏力，新项目建设周期长，2026年全球铜矿供给预计仅增长2%。",
+              "source": "cleaned_text",
+              "start_char": 0,
+              "end_char": 72,
+              "match_type": "keyword"
+            },
+            {
+              "quote": "观点：中期看涨沪铜，目标价位80000元/吨。",
+              "source": "cleaned_text",
+              "start_char": 143,
+              "end_char": 167,
+              "match_type": "reason"
+            }
+          ],
+          "notes": "由 reason 在清洗文本中定位"
+        }
+      }
+    ],
     "task_logs": [
       {
         "id": 7,

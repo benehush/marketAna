@@ -12,6 +12,7 @@ import os
 import re
 from typing import Any
 
+from pn04.document_formatter import build_document_text
 from pn04.exceptions import EmptyContentError, FileReadError, FileNotFoundError_
 from pn04.models import ParseConfig, ParseResult, ParserType
 from pn04.table_utils import pdf_table_to_markdown
@@ -65,7 +66,7 @@ class PdfParser:
         }
 
         all_pages: list[str] = []
-        table_count = 0
+        table_texts: list[str] = []
 
         try:
             doc = fitz.open(file_path)
@@ -84,8 +85,8 @@ class PdfParser:
                                 tbl,
                                 add_description=self.config.table_add_description,
                             )
-                            page_text += "\n" + md_table
-                            table_count += 1
+                            if md_table.strip():
+                                table_texts.append(f"### Page {page_num} 表格\n{md_table}")
 
                     all_pages.append(page_text)
                     metadata["text_pages"] += 1
@@ -98,8 +99,17 @@ class PdfParser:
 
             doc.close()
 
-            metadata["tables_found"] = table_count
-            raw_text = "\n\n".join(all_pages)
+            metadata["tables_found"] = len(table_texts)
+            body_text = "\n\n".join(all_pages)
+            table_text = "\n\n".join(table_texts)
+            raw_text = build_document_text(
+                title=os.path.basename(file_path),
+                source_file=file_path,
+                parser_type=ParserType.PDF.value,
+                body_text=body_text,
+                table_text=table_text,
+                max_text_length=self.config.max_text_length,
+            )
 
             if not raw_text.strip():
                 raise EmptyContentError(

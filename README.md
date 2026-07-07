@@ -65,7 +65,7 @@ uv run python scripts/ingest_files.py --root data --limit 20 --include-images
 ### 4. 启动后端服务（含自动清洗流水线）
 
 ```bash
-uv run uvicorn back_end.app.main:app --reload
+uv run uvicorn back_end.app.main:app --reload --host 0.0.0.0
 ```
 
 应用启动时自动执行以下操作：

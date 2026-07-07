@@ -189,6 +189,55 @@ def test_full_pipeline_high_conf(session_factory):
     session2.close()
 
 
+def test_full_pipeline_multi_product_high_conf(session_factory):
+    """多品种明确观点 → 生成多条规则结果并直接入库。"""
+    session = session_factory()
+    text = (
+        "## 核心正文\n"
+        "【螺纹钢】螺纹钢看涨，上涨趋势明确，短期偏强，建议做多。\n"
+        "【铁矿石】铁矿石看跌，下跌趋势明确，短期偏弱，建议做空。"
+    )
+    aid = _create_article_with_clean(session, text)
+    session.close()
+
+    session2 = session_factory()
+    result = analyze_article(aid, session2)
+    session2.commit()
+
+    assert result.need_llm is False
+    assert len(result.results) == 2
+    assert {item.product for item in result.results} == {"螺纹钢", "铁矿石"}
+
+    repo = ArticleRepository(session2)
+    article = repo.get_article_detail(aid)
+    assert article.status == ArticleProcessingStatus.STORED.value
+    assert len(article.analysis_results) == 2
+    assert {item.direction for item in article.analysis_results} == {"看涨", "看跌"}
+    session2.close()
+
+
+def test_full_pipeline_same_product_different_contracts(session_factory):
+    """同一品种不同合约 → 按 contract_key 保存为不同结果。"""
+    session = session_factory()
+    text = (
+        "【甲醇05合约】甲醇05合约看涨，上涨趋势明确，短期偏强，建议做多。"
+        "【甲醇09合约】甲醇09合约看跌，下跌趋势明确，短期偏弱，建议做空。"
+    )
+    aid = _create_article_with_clean(session, text)
+    session.close()
+
+    session2 = session_factory()
+    result = analyze_article(aid, session2)
+    session2.commit()
+
+    assert result.need_llm is False
+    repo = ArticleRepository(session2)
+    article = repo.get_article_detail(aid)
+    assert len(article.analysis_results) == 2
+    assert {item.contract for item in article.analysis_results} == {"05", "09"}
+    session2.close()
+
+
 def test_full_pipeline_low_conf(session_factory):
     """低置信文章 → status=3, need_llm=True。"""
     session = session_factory()

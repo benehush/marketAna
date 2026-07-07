@@ -5,10 +5,11 @@
 from datetime import datetime, time
 from typing import Any
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from back_end.app.core.exceptions import AppException, ErrorCode
+from back_end.app.core.display import displayable_product_clause
 from back_end.app.core.status import ARTICLE_STATUS_VALUES, ArticleProcessingStatus
 from back_end.app.models import (
     ANALYSIS_METHOD_VALUES,
@@ -74,7 +75,7 @@ class ArticleRepository(BaseRepository):
             select(Article)
             .options(
                 selectinload(Article.text),
-                selectinload(Article.analysis_result),
+                selectinload(Article.analysis_results),
                 selectinload(Article.task_logs),
                 selectinload(Article.manual_confirmations),
             )
@@ -170,51 +171,128 @@ class ArticleRepository(BaseRepository):
         need_manual_review: bool = False,
         analysis_time: datetime | None = None,
         mark_stored: bool = True,
+        contract: str | None = None,
+        is_primary: bool | None = None,
+        model_name: str | None = None,
+        llm_duration_ms: int | None = None,
+        llm_retry_count: int | None = None,
+        llm_error_msg: str | None = None,
     ) -> AnalysisResult:
-        """保存 LLM 分析结果。
+        """保存单条分析结果，兼容旧调用方。"""
+        results = self.save_analysis_results(
+            article_id,
+            [
+                {
+                    "product": product,
+                    "contract": contract,
+                    "direction": direction,
+                    "reason": reason,
+                    "confidence": confidence,
+                    "analysis_method": analysis_method,
+                    "need_manual_review": need_manual_review,
+                    "analysis_time": analysis_time,
+                    "is_primary": is_primary,
+                    "model_name": model_name,
+                    "llm_duration_ms": llm_duration_ms,
+                    "llm_retry_count": llm_retry_count,
+                    "llm_error_msg": llm_error_msg,
+                }
+            ],
+            mark_stored=mark_stored,
+        )
+        return results[0]
 
-        若该文章已有分析结果则更新，否则新建。
-        同时可根据参数决定是否将文章状态标记为 STORED。
+    def save_analysis_results(
+        self,
+        article_id: int,
+        results: list[dict[str, Any]],
+        *,
+        mark_stored: bool = True,
+    ) -> list[AnalysisResult]:
+        """批量保存一篇文章的多品种分析结果。
 
-        Args:
-            article_id:       文章 ID
-            product:          产品名称
-            direction:        市场方向（涨/跌等）
-            reason:           分析原因
-            confidence:       置信度（0 ~ 1）
-            analysis_method:  分析方法（如 gpt4, claude 等）
-            need_manual_review: 是否需要人工复核
-            analysis_time:    分析时间
-            mark_stored:      是否将文章状态标记为已存储
-
-        Returns:
-            保存后的 AnalysisResult 实例
+        按 (article_id, product, contract_key) 幂等更新；不删除未出现在本批次
+        的既有结果，便于规则高置信结果和 LLM 补全结果分阶段合并。
         """
         self.require_article(article_id)
-        self._validate_direction(direction)
-        self._validate_confidence(confidence)
-        self._validate_analysis_method(analysis_method)
+        if not results:
+            return []
 
-        # 查询现有分析结果，存在则更新，不存在则新建
-        result = self.session.scalar(
-            select(AnalysisResult).where(AnalysisResult.article_id == article_id)
-        )
-        if result is None:
-            result = AnalysisResult(article_id=article_id)
-            self.session.add(result)
+        normalized: list[dict[str, Any]] = []
+        for item in results:
+            product = str(item.get("product") or "").strip()
+            direction = str(item.get("direction") or "").strip()
+            confidence = float(item.get("confidence") or 0.0)
+            analysis_method = str(item.get("analysis_method") or "").strip()
+            if not product:
+                raise AppException(
+                    code=ErrorCode.VALIDATION_ERROR,
+                    message="Invalid product",
+                    detail={"product": product},
+                )
+            self._validate_direction(direction)
+            self._validate_confidence(confidence)
+            self._validate_analysis_method(analysis_method)
+            contract = item.get("contract")
+            contract = str(contract).strip() if contract is not None and str(contract).strip() else None
+            normalized.append(
+                {
+                    **item,
+                    "product": product,
+                    "contract": contract,
+                    "contract_key": self._normalize_contract_key(contract),
+                    "direction": direction,
+                    "confidence": confidence,
+                    "analysis_method": analysis_method,
+                }
+            )
 
-        result.product = product
-        result.direction = direction
-        result.reason = reason
-        result.confidence = confidence
-        result.analysis_method = analysis_method
-        result.need_manual_review = need_manual_review
-        if analysis_time is not None:
-            result.analysis_time = analysis_time
+        explicit_primary = any(item.get("is_primary") is True for item in normalized)
+        if not explicit_primary:
+            best = max(normalized, key=lambda item: item["confidence"])
+            best["is_primary"] = True
+
+        if any(item.get("is_primary") is True for item in normalized):
+            existing_results = list(self.session.scalars(
+                select(AnalysisResult).where(AnalysisResult.article_id == article_id)
+            ).all())
+            for existing in existing_results:
+                existing.is_primary = False
+
+        saved: list[AnalysisResult] = []
+        for item in normalized:
+            result = self.session.scalar(
+                select(AnalysisResult).where(
+                    AnalysisResult.article_id == article_id,
+                    AnalysisResult.product == item["product"],
+                    AnalysisResult.contract_key == item["contract_key"],
+                )
+            )
+            if result is None:
+                result = AnalysisResult(article_id=article_id)
+                self.session.add(result)
+
+            result.product = item["product"]
+            result.contract = item["contract"]
+            result.contract_key = item["contract_key"]
+            result.direction = item["direction"]
+            result.reason = item.get("reason")
+            result.confidence = item["confidence"]
+            result.analysis_method = item["analysis_method"]
+            result.need_manual_review = bool(item.get("need_manual_review", False))
+            result.is_primary = bool(item.get("is_primary", False))
+            result.model_name = item.get("model_name")
+            result.llm_duration_ms = item.get("llm_duration_ms")
+            result.llm_retry_count = item.get("llm_retry_count")
+            result.llm_error_msg = item.get("llm_error_msg")
+            if item.get("analysis_time") is not None:
+                result.analysis_time = item["analysis_time"]
+            saved.append(result)
+
         if mark_stored:
             self.update_status(article_id, ArticleProcessingStatus.STORED)
         self.session.flush()
-        return result
+        return saved
 
     def update_status(
         self,
@@ -357,7 +435,7 @@ class ArticleRepository(BaseRepository):
         items = list(
             self.session.scalars(
                 stmt.options(
-                    selectinload(Article.analysis_result),
+                    selectinload(Article.analysis_results),
                     selectinload(Article.text),
                 )
                 .order_by(
@@ -420,17 +498,25 @@ class ArticleRepository(BaseRepository):
         # 待人工复核数
         manual_review_count = int(
             self.session.scalar(
-                select(func.count(AnalysisResult.id)).where(
-                    AnalysisResult.need_manual_review.is_(True)
+                select(func.count(AnalysisResult.id))
+                .join(Article, Article.id == AnalysisResult.article_id)
+                .where(
+                    Article.status == ArticleProcessingStatus.STORED.value,
+                    AnalysisResult.need_manual_review.is_(True),
+                    displayable_product_clause(AnalysisResult.product),
                 )
             )
             or 0
         )
         # 方向分布统计
         direction_rows = self.session.execute(
-            select(AnalysisResult.direction, func.count(AnalysisResult.id)).group_by(
-                AnalysisResult.direction
+            select(AnalysisResult.direction, func.count(AnalysisResult.id))
+            .join(Article, Article.id == AnalysisResult.article_id)
+            .where(
+                Article.status == ArticleProcessingStatus.STORED.value,
+                displayable_product_clause(AnalysisResult.product),
             )
+            .group_by(AnalysisResult.direction)
         ).all()
         direction_distribution = {direction: 0 for direction in DIRECTION_VALUES}
         direction_distribution.update({row[0]: int(row[1]) for row in direction_rows})
@@ -472,6 +558,10 @@ class ArticleRepository(BaseRepository):
                 func.count(AnalysisResult.id).label("count"),
             )
             .join(Article, Article.id == AnalysisResult.article_id)
+            .where(
+                Article.status == ArticleProcessingStatus.STORED.value,
+                displayable_product_clause(AnalysisResult.product),
+            )
             .group_by("date", AnalysisResult.product, AnalysisResult.direction)
             .order_by("date", AnalysisResult.product)
         )
@@ -551,6 +641,7 @@ class ArticleRepository(BaseRepository):
 
         # 用修正数据覆盖原分析结果
         result.product = product
+        result.contract_key = self._normalize_contract_key(result.contract)
         result.direction = direction
         result.reason = reason
         result.confidence = confidence
@@ -586,16 +677,31 @@ class ArticleRepository(BaseRepository):
     ) -> Select[tuple[Article]]:
         """构建文章列表的筛选查询语句。
 
-        左连接 AnalysisResult 表，按传入条件动态拼接 WHERE 子句。
+        使用 relationship.any 过滤分析结果，避免一文多结果导致文章重复。
         """
-        stmt = select(Article).outerjoin(AnalysisResult)
+        displayable_clause = displayable_product_clause(AnalysisResult.product)
+        stmt = select(Article).where(Article.analysis_results.any(displayable_clause))
         if product:
-            stmt = stmt.where(AnalysisResult.product == product)
+            stmt = stmt.where(
+                Article.analysis_results.any(
+                    and_(
+                        displayable_clause,
+                        AnalysisResult.product == product,
+                    )
+                )
+            )
         if company:
             stmt = stmt.where(Article.company == company)
         if direction:
             self._validate_direction(direction)
-            stmt = stmt.where(AnalysisResult.direction == direction)
+            stmt = stmt.where(
+                Article.analysis_results.any(
+                    and_(
+                        displayable_clause,
+                        AnalysisResult.direction == direction,
+                    )
+                )
+            )
         if status is not None:
             if status not in ARTICLE_STATUS_VALUES:
                 raise AppException(
@@ -615,7 +721,12 @@ class ArticleRepository(BaseRepository):
                     Article.title.like(pattern),
                     Article.source.like(pattern),
                     Article.company.like(pattern),
-                    AnalysisResult.reason.like(pattern),
+                    Article.analysis_results.any(
+                        and_(
+                            displayable_clause,
+                            AnalysisResult.reason.like(pattern),
+                        )
+                    ),
                 )
             )
         return stmt
@@ -658,3 +769,10 @@ class ArticleRepository(BaseRepository):
                 message="Invalid confidence",
                 detail={"confidence": confidence},
             )
+
+    @staticmethod
+    def _normalize_contract_key(contract: str | None) -> str:
+        """归一化合约键，空合约使用空字符串参与唯一约束。"""
+        if not contract:
+            return ""
+        return str(contract).strip().lower().replace("合约", "").replace(" ", "")

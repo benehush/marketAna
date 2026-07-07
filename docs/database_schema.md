@@ -6,7 +6,7 @@
 
 - 用 `articles` 作为文章主表，保存外部导入文章的元信息和处理状态。
 - 用 `article_texts` 保存一篇文章的原始文本和清洗后文本。
-- 用 `analysis_results` 保存当前有效分析结果，供前端页面、趋势图和统计查询使用。
+- 用 `analysis_results` 保存当前有效分析结果，一篇文章可包含多个品种/合约观点，供前端页面、趋势图和统计查询使用。
 - 用 `task_logs` 记录解析、清洗、规则识别、LLM 推理等流水线阶段日志。
 - 用 `manual_confirmations` 保存人工修正确认记录，保留修改前后对比，满足审计需求。
 
@@ -100,7 +100,7 @@
 关系：
 
 - 一对一：`articles -> article_texts`
-- 一对一：`articles -> analysis_results`
+- 一对多：`articles -> analysis_results`
 - 一对多：`articles -> task_logs`
 - 一对多：`articles -> manual_confirmations`
 
@@ -134,18 +134,25 @@
 
 ### 3.3 `analysis_results`
 
-分析结果表，保存当前有效的品种、方向、理由、置信度和分析方法。
+分析结果表，保存当前有效的品种/合约、方向、理由、置信度和分析方法。
 
 | 字段 | 类型 | 必填 | 默认值 | 说明 |
 | --- | --- | --- | --- | --- |
 | `id` | `Integer` | 是 | 自增 | 主键 |
 | `article_id` | `ForeignKey(articles.id)` | 是 | 无 | 关联文章 |
 | `product` | `String(128)` | 是 | 无 | 期货品种 |
+| `contract` | `String(64)` | 否 | `NULL` | 合约，如 `05`、`2505` |
+| `contract_key` | `String(64)` | 是 | `""` | 合约归一化键，参与幂等唯一约束 |
 | `direction` | `String(16)` | 是 | 无 | `看涨`、`看跌`、`中性` |
 | `reason` | `Text` | 否 | `NULL` | 分析理由 |
 | `confidence` | `Float` | 是 | 无 | 置信度，范围 `0-1` |
 | `analysis_method` | `String(32)` | 是 | 无 | `rule`、`llm`、`manual` |
 | `need_manual_review` | `Boolean` | 是 | `False` | 是否需要人工确认 |
+| `is_primary` | `Boolean` | 是 | `False` | 是否为文章兼容主结果 |
+| `model_name` | `String(128)` | 否 | `NULL` | LLM 模型名称 |
+| `llm_duration_ms` | `Integer` | 否 | `NULL` | LLM 调用耗时 |
+| `llm_retry_count` | `Integer` | 否 | `NULL` | LLM 重试次数 |
+| `llm_error_msg` | `Text` | 否 | `NULL` | LLM 解析/调用错误摘要 |
 | `analysis_time` | `DateTime` | 是 | `func.now()` | 分析完成时间 |
 | `created_at` | `DateTime` | 是 | `func.now()` | 创建时间 |
 | `updated_at` | `DateTime` | 是 | `func.now()` | 更新时间 |
@@ -154,7 +161,7 @@
 
 | 名称 | 类型 | 字段 | 说明 |
 | --- | --- | --- | --- |
-| `uq_analysis_results_article_id` | UniqueConstraint | `article_id` | 一篇文章只保留一条当前有效分析结果 |
+| `uq_analysis_results_article_product_contract` | UniqueConstraint | `article_id`, `product`, `contract_key` | 同一文章同一品种合约只保留一条当前有效结果 |
 | `ck_analysis_results_direction` | CheckConstraint | `direction` | 限制方向枚举 |
 | `ck_analysis_results_confidence` | CheckConstraint | `confidence` | 限制置信度为 `0-1` |
 | `ck_analysis_results_method` | CheckConstraint | `analysis_method` | 限制分析方法枚举 |
@@ -234,7 +241,7 @@
 ```text
 articles
   ├── article_texts          一对一，保存原始文本和清洗文本
-  ├── analysis_results       一对一，保存当前有效分析结果
+  ├── analysis_results       一对多，保存当前有效多品种分析结果
   ├── task_logs              一对多，保存流水线执行日志
   └── manual_confirmations   一对多，保存人工确认审计记录
 ```
@@ -243,17 +250,17 @@ articles
 
 ## 5. 设计取舍
 
-### 5.1 当前分析结果只保留一条
+### 5.1 当前分析结果按品种/合约保留
 
-`analysis_results.article_id` 使用唯一约束，表示一篇文章只保留一条当前有效分析结果。文章重跑或人工确认时，更新当前结果，而不是新增多个版本。
+`analysis_results` 使用 `(article_id, product, contract_key)` 唯一约束，表示一篇文章可保留多条当前有效结果，但同一品种合约重跑时更新旧结果。
 
 理由：
 
-- 前端统计、列表、趋势图只需要当前有效结论。
-- 可避免同一文章多次重跑导致重复统计。
-- 第一版需求更重视演示和联调稳定性，暂不做多版本历史。
+- 晨会、日报常包含多个期货品种，需要分别进入品种、公司和趋势统计。
+- 可避免同一品种合约多次重跑导致重复统计。
+- `is_primary` 保留文章级主结果，兼容旧前端字段 `analysis_result`。
 
-如果后续需要分析结果历史，可以新增 `analysis_result_versions` 或取消唯一约束并增加 `is_current` 字段。
+如果后续需要分析结果历史，可以新增 `analysis_result_versions` 或增加 `is_current` 字段。
 
 ### 5.2 人工确认保留审计记录
 
@@ -313,7 +320,7 @@ articles
 当前测试覆盖在 [tests/test_backend_data.py](/home/sanmu/marketANA/tests/test_backend_data.py)：
 
 - 核心表能创建成功。
-- `analysis_results.article_id` 唯一约束存在。
+- `analysis_results` 存在 `(article_id, product, contract_key)` 唯一约束。
 - `articles.status` 非法值会触发约束错误。
 - 状态流转、失败日志、分析结果幂等覆盖可用。
 - 统计、趋势、列表、详情、人工确认接口契约可用。

@@ -11,19 +11,25 @@ export type Direction = '看涨' | '看跌' | '中性'
 // ===== 单条预测 =====
 export interface Prediction {
   article_id: number
+  result_id?: number
   direction: Direction
   confidence: number
   company: string
   date: string
   reason?: string
+  contract?: string | null
+  need_manual_review?: boolean
 }
 
 export interface CompanyPrediction {
   article_id: number
+  result_id?: number
   product: string
+  contract?: string | null
   direction: Direction
   confidence: number
   date: string
+  need_manual_review?: boolean
 }
 
 // ===== 品种页面 =====
@@ -54,6 +60,118 @@ export interface ArticleItem {
   publish_time: string
   summary?: string
   url?: string
+}
+
+// ===== 文章详情 =====
+export interface ArticleDetail {
+  article: {
+    id: number
+    title: string
+    source: string
+    company: string
+    file_url: string | null
+    file_type: string | null
+    publish_time: string | null
+    status: number
+    error_msg: string | null
+    created_at: string
+    updated_at: string
+    product: string | null
+    direction: string | null
+    reason: string | null
+    confidence: number | null
+    need_manual_review: boolean
+    analysis_time: string | null
+  }
+  text: {
+    raw_text: string | null
+    cleaned_text: string | null
+    raw_length: number
+    cleaned_length: number
+    parser_type: string | null
+  } | null
+  analysis_result: {
+    id?: number
+    product: string
+    contract?: string | null
+    contract_key?: string
+    direction: string
+    reason: string | null
+    confidence: number
+    analysis_method: string
+    need_manual_review: boolean
+    is_primary?: boolean
+    model_name?: string | null
+    llm_duration_ms?: number | null
+    llm_retry_count?: number | null
+    llm_error_msg?: string | null
+    analysis_time: string | null
+    evidence?: AnalysisEvidence
+  } | null
+  analysis_results: AnalysisResultItem[]
+  task_logs: TaskLogItem[]
+  manual_confirmations: ManualConfirmationItem[]
+}
+
+export interface EvidenceExcerpt {
+  quote: string
+  source: 'cleaned_text' | 'raw_text' | 'analysis_reason'
+  start_char: number | null
+  end_char: number | null
+  match_type: 'reason' | 'keyword' | 'fallback'
+}
+
+export interface AnalysisEvidence {
+  summary: string
+  source: 'cleaned_text' | 'raw_text' | 'analysis_reason'
+  excerpts: EvidenceExcerpt[]
+  notes: string
+}
+
+export interface AnalysisResultItem {
+  id: number
+  article_id: number
+  product: string
+  contract: string | null
+  contract_key: string
+  direction: string
+  reason: string | null
+  confidence: number
+  analysis_method: string
+  need_manual_review: boolean
+  is_primary: boolean
+  model_name: string | null
+  llm_duration_ms: number | null
+  llm_retry_count: number | null
+  llm_error_msg: string | null
+  analysis_time: string | null
+  evidence?: AnalysisEvidence
+}
+
+export interface TaskLogItem {
+  id: number
+  article_id: number
+  stage: string
+  status: string
+  message: string | null
+  duration_ms: number | null
+  created_at: string
+}
+
+export interface ManualConfirmationItem {
+  id: number
+  article_id: number
+  original_product: string | null
+  original_direction: string | null
+  original_reason: string | null
+  original_confidence: number | null
+  confirmed_product: string
+  confirmed_direction: string
+  confirmed_reason: string | null
+  confirmed_confidence: number
+  confirmed_by: string | null
+  note: string | null
+  confirmed_at: string
 }
 
 // ===== 方向对应的颜色和标签 =====

@@ -49,7 +49,7 @@ def test_models_create_tables_and_enforce_status_constraint(session_factory) -> 
         "manual_confirmations",
     }.issubset(set(inspector.get_table_names()))
     assert any(
-        constraint["name"] == "uq_analysis_results_article_id"
+        constraint["name"] == "uq_analysis_results_article_product_contract"
         for constraint in inspector.get_unique_constraints("analysis_results")
     )
 
@@ -97,8 +97,27 @@ def test_repository_status_flow_failure_log_and_result_idempotency(session_facto
         analysis_method="llm",
         need_manual_review=True,
     )
-    assert session.scalar(select(AnalysisResult).where(AnalysisResult.article_id == article.id)).product == "铁矿石"
-    assert len(session.scalars(select(AnalysisResult).where(AnalysisResult.article_id == article.id)).all()) == 1
+    saved = session.scalars(select(AnalysisResult).where(AnalysisResult.article_id == article.id)).all()
+    assert {result.product for result in saved} == {"螺纹钢", "铁矿石"}
+    assert len(saved) == 2
+
+    repository.save_analysis_result(
+        article.id,
+        product="铁矿石",
+        direction="看跌",
+        reason="需求走弱",
+        confidence=0.72,
+        analysis_method="llm",
+        need_manual_review=False,
+    )
+    saved = session.scalars(select(AnalysisResult).where(AnalysisResult.article_id == article.id)).all()
+    assert len(saved) == 2
+    assert session.scalar(
+        select(AnalysisResult).where(
+            AnalysisResult.article_id == article.id,
+            AnalysisResult.product == "铁矿石",
+        )
+    ).direction == "看跌"
 
     failed = repository.create_article(title="坏文件")
     repository.mark_failed(
@@ -193,7 +212,7 @@ def test_api_handlers_return_contracts_for_articles_trends_and_confirm(session_f
     list_body = list_articles(product="豆粕", page=1, page_size=20, session=api_session)
     assert list_body["code"] == 0
     assert len(list_body["data"]) == 1
-    assert list_body["data"][0]["summary"] == "震荡整理"
+    assert list_body["data"][0]["summary"] == "豆粕中性 0.45"
     assert list_body["data"][0]["publish_time"] == "2026-07-02"
 
     products_body = get_products(session=api_session)
@@ -209,6 +228,9 @@ def test_api_handlers_return_contracts_for_articles_trends_and_confirm(session_f
     detail_body = get_article_detail(article.id, session=api_session)
     assert detail_body["data"]["text"]["cleaned_text"] == "cleaned"
     assert detail_body["data"]["task_logs"][0]["stage"] == "llm"
+    assert len(detail_body["data"]["analysis_results"]) == 1
+    assert detail_body["data"]["analysis_result"]["product"] == "豆粕"
+    assert detail_body["data"]["analysis_results"][0]["evidence"]["summary"] == "震荡整理"
 
     trends_body = get_trends(product="豆粕", session=api_session)
     assert trends_body["data"][0]["product"] == "豆粕"
@@ -232,7 +254,170 @@ def test_api_handlers_return_contracts_for_articles_trends_and_confirm(session_f
     assert confirmed_detail["data"]["analysis_result"]["direction"] == "看涨"
     assert confirmed_detail["data"]["analysis_result"]["analysis_method"] == "manual"
     assert confirmed_detail["data"]["analysis_result"]["need_manual_review"] is False
+    assert confirmed_detail["data"]["analysis_results"][0]["direction"] == "看涨"
     api_session.close()
+
+
+def test_unknown_analysis_results_are_stored_but_hidden_from_frontend_apis(session_factory) -> None:
+    seed_session = session_factory()
+    repository = ArticleRepository(seed_session)
+    article = repository.create_article(
+        title="无有效观点",
+        source="日报",
+        company="空内容期货",
+        publish_time=datetime(2026, 7, 3, 9, 0),
+    )
+    repository.save_analysis_result(
+        article.id,
+        product="未知",
+        direction="中性",
+        reason="文本仅包含导航和免责声明",
+        confidence=0.0,
+        analysis_method="llm",
+        need_manual_review=True,
+    )
+    seed_session.commit()
+
+    saved = seed_session.scalars(
+        select(AnalysisResult).where(AnalysisResult.article_id == article.id)
+    ).all()
+    assert len(saved) == 1
+    assert saved[0].product == "未知"
+
+    list_body = list_articles(page=1, page_size=20, session=seed_session)
+    assert list_body["data"] == []
+
+    products_body = get_products(session=seed_session)
+    assert products_body["data"] == []
+
+    companies_body = get_companies(session=seed_session)
+    assert companies_body["data"] == []
+
+    trends_body = get_trends(session=seed_session)
+    assert trends_body["data"] == []
+
+    detail_body = get_article_detail(article.id, session=seed_session)
+    assert detail_body["data"]["analysis_result"] is None
+    assert detail_body["data"]["analysis_results"] == []
+
+    summary = repository.get_dashboard_summary(today=datetime(2026, 7, 3, 12, 0))
+    assert summary["success_count"] == 1
+    assert summary["manual_review_count"] == 0
+    assert summary["direction_distribution"] == {"看涨": 0, "看跌": 0, "中性": 0}
+    seed_session.close()
+
+
+def test_mixed_unknown_and_valid_results_only_show_valid_result(session_factory) -> None:
+    session = session_factory()
+    repository = ArticleRepository(session)
+    article = repository.create_article(
+        title="混合观点",
+        source="日报",
+        company="混合期货",
+        publish_time=datetime(2026, 7, 3, 10, 0),
+    )
+    repository.save_analysis_results(
+        article.id,
+        [
+            {
+                "product": "未知",
+                "direction": "中性",
+                "reason": "无有效内容",
+                "confidence": 0.1,
+                "analysis_method": "llm",
+                "need_manual_review": True,
+                "is_primary": True,
+            },
+            {
+                "product": "豆粕",
+                "direction": "看涨",
+                "reason": "需求改善",
+                "confidence": 0.82,
+                "analysis_method": "llm",
+                "need_manual_review": False,
+                "is_primary": False,
+            },
+        ],
+    )
+    session.commit()
+
+    body = list_articles(page=1, page_size=20, session=session)
+    assert len(body["data"]) == 1
+    assert body["data"][0]["summary"] == "豆粕看涨 0.82"
+
+    products_body = get_products(session=session)
+    assert [item["product"] for item in products_body["data"]] == ["豆粕"]
+
+    companies_body = get_companies(session=session)
+    assert companies_body["data"][0]["predictions"][0]["product"] == "豆粕"
+
+    trends_body = get_trends(session=session)
+    assert trends_body["data"] == [{"date": "2026-07-03", "product": "豆粕", "value": 0.82}]
+
+    detail_body = get_article_detail(article.id, session=session)
+    assert detail_body["data"]["analysis_result"]["product"] == "豆粕"
+    assert [item["product"] for item in detail_body["data"]["analysis_results"]] == ["豆粕"]
+    session.close()
+
+
+def test_article_detail_builds_traceable_evidence_from_cleaned_text(session_factory) -> None:
+    session = session_factory()
+    repository = ArticleRepository(session)
+    article = repository.create_article(title="豆粕证据")
+    cleaned_text = "豆粕库存下降，价格震荡整理。后续需求恢复，豆粕看涨。"
+    reason = "库存下降，价格震荡整理"
+    repository.save_raw_text(article.id, "raw", parser_type="html")
+    repository.save_cleaned_text(article.id, cleaned_text)
+    repository.save_analysis_result(
+        article.id,
+        product="豆粕",
+        direction="中性",
+        reason=reason,
+        confidence=0.72,
+        analysis_method="rule",
+    )
+    session.commit()
+
+    body = get_article_detail(article.id, session=session)
+    evidence = body["data"]["analysis_results"][0]["evidence"]
+
+    assert evidence["summary"] == reason
+    assert evidence["source"] == "cleaned_text"
+    assert evidence["excerpts"][0]["source"] == "cleaned_text"
+    assert evidence["excerpts"][0]["match_type"] == "reason"
+    assert reason in evidence["excerpts"][0]["quote"]
+    assert evidence["excerpts"][0]["start_char"] == 0
+    assert evidence["excerpts"][0]["end_char"] > evidence["excerpts"][0]["start_char"]
+    session.close()
+
+
+def test_article_detail_falls_back_to_analysis_reason_when_evidence_is_not_located(session_factory) -> None:
+    session = session_factory()
+    repository = ArticleRepository(session)
+    article = repository.create_article(title="棉花证据")
+    reason = "进口利润收窄支撑价格"
+    repository.save_cleaned_text(article.id, "没有相关文本")
+    repository.save_analysis_result(
+        article.id,
+        product="棉花",
+        direction="看涨",
+        reason=reason,
+        confidence=0.6,
+        analysis_method="llm",
+    )
+    session.commit()
+
+    body = get_article_detail(article.id, session=session)
+    evidence = body["data"]["analysis_result"]["evidence"]
+
+    assert evidence["summary"] == reason
+    assert evidence["source"] == "analysis_reason"
+    assert evidence["excerpts"][0]["quote"] == reason
+    assert evidence["excerpts"][0]["start_char"] is None
+    assert evidence["excerpts"][0]["end_char"] is None
+    assert evidence["excerpts"][0]["match_type"] == "fallback"
+    assert "未能定位原文" in evidence["notes"]
+    session.close()
 
 
 def test_articles_list_handles_null_publish_time(session_factory) -> None:

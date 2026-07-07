@@ -7,7 +7,7 @@ defineProps<{
 </script>
 
 <template>
-  <div class="article-card">
+  <router-link :to="`/articles/${article.id}`" class="article-card">
     <h4 class="article-title">{{ article.title }}</h4>
     <div class="article-meta">
       <span class="article-source">来源：{{ article.source }}</span>
@@ -16,16 +16,20 @@ defineProps<{
     <p v-if="article.summary" class="article-summary">
       {{ article.summary }}
     </p>
-  </div>
+  </router-link>
 </template>
 
 <style scoped>
 .article-card {
+  display: block;
   background: #fff;
   border-radius: 10px;
   padding: 16px 20px;
   border: 1px solid #f0f0f0;
   transition: box-shadow 0.2s;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
 }
 
 .article-card:hover {
