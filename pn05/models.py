@@ -4,7 +4,7 @@ pn05 数据模型
 定义清洗配置和清洗结果。
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -26,6 +26,18 @@ class CleanConfig:
     filter_noise_lines: bool = True      # 启用噪声规则库过滤
     filter_low_density: bool = True      # 基于密度剔除页眉页脚
 
+    # pn04 模板化 raw_text 清洗
+    structured_output: bool = True       # 输出轻量 Markdown 模板
+    preserve_source_header: bool = True  # 保留来源文件/解析器信息
+    keep_markdown_tables: bool = True    # 保留 Markdown 表格
+
+    # OCR 数字噪声过滤
+    drop_numeric_dominant_blocks: bool = True
+    numeric_block_digit_ratio: float = 0.35
+    numeric_block_max_cjk_chars: int = 6
+    chart_axis_date_count: int = 5
+    min_semantic_line_chars: int = 8
+
     # 输出保护
     max_text_length: int = 500_000       # 最大输出长度（截断保护）
 
@@ -39,6 +51,7 @@ class CleanResult:
     removal_ratio: float = 0.0           # (raw - cleaned) / raw
     noise_lines_removed: int = 0         # 被噪声规则移除的行数
     low_density_removed: int = 0         # 低密度块被移除的字符数
+    numeric_blocks_removed: int = 0      # 被移除的数字/OCR 图表噪声行数
     duration_ms: int = 0
 
     @property
@@ -53,5 +66,6 @@ class CleanResult:
             f"raw={self.raw_length} → cleaned={self.cleaned_length} "
             f"({pct} removed) "
             f"noise_lines={self.noise_lines_removed} "
+            f"numeric_blocks={self.numeric_blocks_removed} "
             f"low_density_chars={self.low_density_removed}"
         )

@@ -21,6 +21,7 @@ from back_end.app.repositories.articles import ArticleRepository
 
 from pn07.models import LLMConfig, InferResult
 from pn07.json_parser import parse_llm_json
+from pn07.llm_client import LLMAPIClient
 from pn07.prompt_builder import build_messages
 
 
@@ -95,6 +96,20 @@ def test_json_parse_normal():
     assert data["product"] == "螺纹钢"
     assert data["direction"] == "看涨"
     assert data["confidence"] == 0.85
+
+
+def test_json_parse_multi_results():
+    raw = (
+        '{"results":['
+        '{"product":"原油","contract":"","direction":"看涨","reason":"供应风险","confidence":0.82},'
+        '{"product":"沪铜","contract":"2505","direction":"看跌","reason":"需求偏弱","confidence":0.66}'
+        ']}'
+    )
+    data, errors = parse_llm_json(raw)
+    assert errors == []
+    assert len(data["results"]) == 2
+    assert data["product"] == "原油"
+    assert data["results"][1]["contract"] == "2505"
 
 
 def test_json_parse_markdown_wrap():
@@ -197,6 +212,37 @@ def test_full_infer_high_conf(session_factory):
     session2.close()
 
 
+def test_full_infer_multi_results(session_factory):
+    """Mock LLM 返回多品种 JSON → 多条结果入库。"""
+    from pn07.llm_infer import infer_article
+
+    session = session_factory()
+    aid = _create_article(session, "原油偏强，沪铜偏弱。", title="多品种日报")
+    session.close()
+
+    response = (
+        '{"results":['
+        '{"product":"原油","contract":"","direction":"看涨","reason":"供应风险升温","confidence":0.82},'
+        '{"product":"沪铜","contract":"","direction":"看跌","reason":"需求承压","confidence":0.61}'
+        ']}'
+    )
+    config = LLMConfig(api_key="sk-test", base_url="https://test.api",
+                       model="test-model", timeout_seconds=5)
+
+    session2 = session_factory()
+    with patch("pn07.llm_client.LLMAPIClient.chat", return_value=response):
+        result = infer_article(aid, session2, config=config)
+    session2.commit()
+
+    assert len(result.results) == 2
+    repo = ArticleRepository(session2)
+    article = repo.get_article_detail(aid)
+    assert article.status == ArticleProcessingStatus.STORED.value
+    assert {item.product for item in article.analysis_results} == {"原油", "沪铜"}
+    assert all(item.model_name == "test-model" for item in article.analysis_results)
+    session2.close()
+
+
 def test_full_infer_low_conf(session_factory):
     """confidence < 0.5 → need_manual_review=True。"""
     from pn07.llm_infer import infer_article
@@ -223,6 +269,34 @@ def test_full_infer_low_conf(session_factory):
     repo = ArticleRepository(session2)
     article = repo.get_article_detail(aid)
     assert article.analysis_result.need_manual_review is True
+    session2.close()
+
+
+def test_full_infer_empty_results_marks_no_market_view(session_factory):
+    """LLM 返回空 results → 记录无可分析观点，而不是误报 JSON 不可解析。"""
+    from pn07.llm_infer import infer_article
+
+    session = session_factory()
+    aid = _create_article(session, "晨报 日报 农产品 能源化工 交易策略 尿素日报", title="目录页")
+    session.close()
+
+    config = LLMConfig(api_key="sk-test", base_url="https://test.api",
+                       model="test", timeout_seconds=5)
+
+    session2 = session_factory()
+    with patch("pn07.llm_client.LLMAPIClient.chat", return_value='{"results":[]}'):
+        result = infer_article(aid, session2, config=config)
+    session2.commit()
+
+    assert result.product == "未知"
+    assert result.direction == "中性"
+    assert result.need_manual_review is True
+
+    repo = ArticleRepository(session2)
+    article = repo.get_article_detail(aid)
+    assert article.status == ArticleProcessingStatus.STORED.value
+    assert "未识别到可分析的期货观点" in article.analysis_result.reason
+    assert article.analysis_result.llm_error_msg == "LLM 返回 results 为空"
     session2.close()
 
 
@@ -298,6 +372,66 @@ def test_full_infer_task_log(session_factory):
 def test_llm_config_is_configured():
     assert LLMConfig().is_configured is False
     assert LLMConfig(api_key="k", base_url="u").is_configured is True
+    assert LLMConfig(provider="wenhua", base_url="https://example.test/api").is_configured is True
+
+
+def test_wenhua_sse_line_parser():
+    line = 'data: {"choices":[{"delta":{"content":"你好"},"finish_reason":null}]}'
+    content, stopped = LLMAPIClient._parse_wenhua_sse_line(line)
+    assert content == "你好"
+    assert stopped is False
+
+    content, stopped = LLMAPIClient._parse_wenhua_sse_line(
+        '{"choices":[{"delta":{"content":""},"finish_reason":"stop"}]}'
+    )
+    assert content == ""
+    assert stopped is True
+
+
+def test_wenhua_chat_stream(monkeypatch):
+    class FakeResponse:
+        status_code = 200
+
+        def iter_lines(self):
+            return iter(
+                [
+                    'data: {"choices":[{"delta":{"content":"{\\"product\\":\\"螺纹钢\\""},"finish_reason":null}]}',
+                    'data: {"choices":[{"delta":{"content":",\\"direction\\":\\"看涨\\",\\"reason\\":\\"需求改善\\",\\"confidence\\":0.8}"},"finish_reason":null}]}',
+                    'data: {"choices":[{"delta":{"content":""},"finish_reason":"stop"}]}',
+                ]
+            )
+
+    class FakeStream:
+        def __enter__(self):
+            return FakeResponse()
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    captured = {}
+
+    def fake_stream(method, url, json, headers, timeout):
+        captured["method"] = method
+        captured["url"] = url
+        captured["json"] = json
+        return FakeStream()
+
+    monkeypatch.setattr("httpx.stream", fake_stream)
+
+    client = LLMAPIClient(
+        LLMConfig(
+            provider="wenhua",
+            base_url="https://swarm.wenhua.com.cn/aiservice/api/ShiXi/GetContent",
+            timeout_seconds=5,
+        )
+    )
+    response = client.chat([{"role": "user", "content": "请输出 JSON"}], retries=0)
+
+    assert captured["method"] == "POST"
+    assert captured["url"].endswith("/GetContent")
+    assert captured["json"]["content"] == "user:\n请输出 JSON"
+    assert '"product":"螺纹钢"' in response
+    assert '"direction":"看涨"' in response
 
 
 # ---- InferResult ----

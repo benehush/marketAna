@@ -1,0 +1,146 @@
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "article": {
+      "id": 3,
+      "title": "沪铜中期展望：新能源需求拉动下的供给缺口",
+      "source": "南华期货",
+      "company": "南华期货",
+      "file_url": "",
+      "file_type": "pdf",
+      "publish_time": "2026-06-15T09:30:00",
+      "status": 5,
+      "error_msg": null,
+      "created_at": "2026-06-15T10:00:00",
+      "updated_at": "2026-06-15T10:05:00",
+      "product": "沪铜",
+      "direction": "看涨",
+      "reason": "新能源需求拉动，铜矿供给偏紧，中期看涨",
+      "confidence": 0.7,
+      "need_manual_review": false,
+      "analysis_time": "2026-06-15T10:04:00"
+    },
+    "text": {
+      "id": 3,
+      "article_id": 3,
+      "raw_text": "【沪铜市场分析】\n\n全球铜矿产能增长有限，新能源领域铜需求持续增长。\n\n供给端：全球主要铜矿产量增长乏力，新项目建设周期长，2026年全球铜矿供给预计仅增长2%。\n\n需求端：新能源汽车渗透率持续提升，光伏、风电等可再生能源领域铜需求保持高速增长。\n\n库存方面：LME铜库存处于历史中低位，国内社会库存持续去化。\n\n观点：中期看涨沪铜，目标价位80000元/吨。",
+      "cleaned_text": "全球铜矿产能增长有限，新能源领域铜需求持续增长。供给端：全球主要铜矿产量增长乏力，新项目建设周期长，2026年全球铜矿供给预计仅增长2%。需求端：新能源汽车渗透率持续提升，光伏、风电等可再生能源领域铜需求保持高速增长。库存方面：LME铜库存处于历史中低位，国内社会库存持续去化。观点：中期看涨沪铜，目标价位80000元/吨。",
+      "raw_length": 216,
+      "cleaned_length": 167,
+      "parser_type": "pdf",
+      "created_at": "2026-06-15T10:02:00",
+      "updated_at": "2026-06-15T10:03:00"
+    },
+    "analysis_result": {
+      "id": 3,
+      "article_id": 3,
+      "product": "沪铜",
+      "contract": null,
+      "contract_key": "",
+      "direction": "看涨",
+      "reason": "新能源需求拉动，铜矿供给偏紧，中期看涨",
+      "confidence": 0.7,
+      "analysis_method": "rule",
+      "need_manual_review": false,
+      "is_primary": true,
+      "model_name": null,
+      "llm_duration_ms": null,
+      "llm_retry_count": null,
+      "llm_error_msg": null,
+      "analysis_time": "2026-06-15T10:04:00",
+      "evidence": {
+        "summary": "新能源需求拉动，铜矿供给偏紧，中期看涨",
+        "source": "cleaned_text",
+        "excerpts": [
+          {
+            "quote": "全球铜矿产能增长有限，新能源领域铜需求持续增长。供给端：全球主要铜矿产量增长乏力，新项目建设周期长，2026年全球铜矿供给预计仅增长2%。",
+            "source": "cleaned_text",
+            "start_char": 0,
+            "end_char": 72,
+            "match_type": "keyword"
+          },
+          {
+            "quote": "观点：中期看涨沪铜，目标价位80000元/吨。",
+            "source": "cleaned_text",
+            "start_char": 143,
+            "end_char": 167,
+            "match_type": "reason"
+          }
+        ],
+        "notes": "由 reason 在清洗文本中定位"
+      }
+    },
+    "analysis_results": [
+      {
+        "id": 3,
+        "article_id": 3,
+        "product": "沪铜",
+        "contract": null,
+        "contract_key": "",
+        "direction": "看涨",
+        "reason": "新能源需求拉动，铜矿供给偏紧，中期看涨",
+        "confidence": 0.7,
+        "analysis_method": "rule",
+        "need_manual_review": false,
+        "is_primary": true,
+        "model_name": null,
+        "llm_duration_ms": null,
+        "llm_retry_count": null,
+        "llm_error_msg": null,
+        "analysis_time": "2026-06-15T10:04:00",
+        "evidence": {
+          "summary": "新能源需求拉动，铜矿供给偏紧，中期看涨",
+          "source": "cleaned_text",
+          "excerpts": [
+            {
+              "quote": "全球铜矿产能增长有限，新能源领域铜需求持续增长。供给端：全球主要铜矿产量增长乏力，新项目建设周期长，2026年全球铜矿供给预计仅增长2%。",
+              "source": "cleaned_text",
+              "start_char": 0,
+              "end_char": 72,
+              "match_type": "keyword"
+            },
+            {
+              "quote": "观点：中期看涨沪铜，目标价位80000元/吨。",
+              "source": "cleaned_text",
+              "start_char": 143,
+              "end_char": 167,
+              "match_type": "reason"
+            }
+          ],
+          "notes": "由 reason 在清洗文本中定位"
+        }
+      }
+    ],
+    "task_logs": [
+      {
+        "id": 7,
+        "article_id": 3,
+        "stage": "parse",
+        "status": "success",
+        "message": "PDF解析完成，共3页",
+        "duration_ms": 1250,
+        "created_at": "2026-06-15T10:02:00"
+      },
+      {
+        "id": 8,
+        "article_id": 3,
+        "stage": "clean",
+        "status": "success",
+        "message": "清洗完成，压缩比77.3%",
+        "duration_ms": 320,
+        "created_at": "2026-06-15T10:03:00"
+      },
+      {
+        "id": 9,
+        "article_id": 3,
+        "stage": "rule_analysis",
+        "status": "success",
+        "message": "规则识别完成，置信度0.70，直接入库",
+        "duration_ms": 150,
+        "created_at": "2026-06-15T10:04:00"
+      }
+    ],
+    "manual_confirmations": []
+  }
+}

@@ -6,7 +6,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from back_end.app.api.serializers import serialize_article_detail
+from back_end.app.api.serializers import get_displayable_analysis_results, serialize_article_detail
 from back_end.app.core.database import get_session
 from back_end.app.core.exceptions import AppException, ErrorCode
 from back_end.app.core.responses import success_response
@@ -74,12 +74,16 @@ def serialize_frontend_article(article) -> dict:
     Returns:
         dict: 包含 id、title、source、company、publish_time、summary、url 字段
     """
-    result = article.analysis_result
+    results = get_displayable_analysis_results(article)
     article_text = article.text
     summary = None
     # 优先取分析理由作为摘要，其次取清洗文本的前 120 字
-    if result and result.reason:
-        summary = result.reason
+    if results:
+        parts = []
+        for result in sorted(results, key=lambda item: (not item.is_primary, item.product, item.contract_key))[:4]:
+            contract = f"{result.contract} " if result.contract else ""
+            parts.append(f"{result.product}{contract}{result.direction} {result.confidence:.2f}")
+        summary = "；".join(parts)
     elif article_text and article_text.cleaned_text:
         summary = article_text.cleaned_text[:120]
 

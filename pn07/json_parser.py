@@ -19,9 +19,6 @@ logger = logging.getLogger(__name__)
 
 DIRECTION_VALUES = ("看涨", "看跌", "中性")
 
-REQUIRED_FIELDS = ["product", "direction", "reason", "confidence"]
-
-
 def parse_llm_json(raw_response: str) -> tuple[dict, list[str]]:
     """
     解析 LLM 原始输出为 dict，并验证字段。
@@ -49,10 +46,45 @@ def parse_llm_json(raw_response: str) -> tuple[dict, list[str]]:
         except json.JSONDecodeError as exc:
             return _empty_result(), [f"JSON 解析失败: {exc}"]
 
-    # 3. 字段校验
+    raw_items = data.get("results") if isinstance(data, dict) else None
+    if isinstance(raw_items, list):
+        items = raw_items
+    elif isinstance(data, dict):
+        items = [data]
+    else:
+        return _empty_result(), ["JSON 根节点必须是对象或 results 数组"]
+
+    parsed_items: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            errors.append(f"results[{index}] 不是对象")
+            continue
+        parsed, item_errors = _parse_item(item)
+        errors.extend(f"results[{index}]: {error}" for error in item_errors)
+        key = (parsed.get("product") or "", parsed.get("contract") or "")
+        if parsed.get("product") and key in seen:
+            errors.append(f"results[{index}]: 重复品种/合约 {key[0]} {key[1]}，已忽略")
+            continue
+        if parsed.get("product"):
+            seen.add(key)
+        parsed_items.append(parsed)
+
+    primary = max(parsed_items, key=lambda item: item.get("confidence", 0.0), default=_empty_item())
+    return {
+        "product": primary.get("product"),
+        "contract": primary.get("contract"),
+        "direction": primary.get("direction"),
+        "reason": primary.get("reason", ""),
+        "confidence": primary.get("confidence", 0.0),
+        "results": parsed_items,
+    }, errors
+
+
+def _parse_item(data: dict) -> tuple[dict, list[str]]:
+    errors: list[str] = []
     result: dict = {}
 
-    # product
     product = data.get("product")
     if product and isinstance(product, str) and product.strip():
         result["product"] = product.strip()
@@ -60,7 +92,9 @@ def parse_llm_json(raw_response: str) -> tuple[dict, list[str]]:
         result["product"] = None
         errors.append("product 缺失或为空")
 
-    # direction
+    contract = data.get("contract")
+    result["contract"] = contract.strip() if isinstance(contract, str) and contract.strip() else None
+
     direction = data.get("direction")
     if direction and isinstance(direction, str):
         direction = direction.strip()
@@ -73,19 +107,17 @@ def parse_llm_json(raw_response: str) -> tuple[dict, list[str]]:
         result["direction"] = None
         errors.append("direction 缺失或为空")
 
-    # reason
     reason = data.get("reason")
     if reason and isinstance(reason, str):
-        result["reason"] = reason.strip()[:200]   # 限制长度
+        result["reason"] = reason.strip()[:240]
     else:
         result["reason"] = ""
         errors.append("reason 缺失")
 
-    # confidence
     confidence = data.get("confidence")
     try:
         conf = float(confidence) if confidence is not None else 0.0
-        conf = max(0.0, min(1.0, conf))   # clamp 0-1
+        conf = max(0.0, min(1.0, conf))
         result["confidence"] = conf
     except (ValueError, TypeError):
         result["confidence"] = 0.0
@@ -132,4 +164,9 @@ def _repair_json(json_str: str) -> str:
 
 
 def _empty_result() -> dict:
-    return {"product": None, "direction": None, "reason": "", "confidence": 0.0}
+    item = _empty_item()
+    return {**item, "results": [item]}
+
+
+def _empty_item() -> dict:
+    return {"product": None, "contract": None, "direction": None, "reason": "", "confidence": 0.0}

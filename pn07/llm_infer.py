@@ -13,7 +13,7 @@ from typing import Any
 from back_end.app.core.status import ArticleProcessingStatus
 
 from pn07.json_parser import parse_llm_json
-from pn07.models import InferResult, LLMConfig
+from pn07.models import InferItem, InferResult, LLMConfig
 from pn07.prompt_builder import build_messages
 
 logger = logging.getLogger(__name__)
@@ -83,6 +83,15 @@ def infer_article(
         company=company,
         publish_time=pub_time,
         max_input_chars=config.max_input_chars,
+        rule_candidates=[
+            {
+                "product": result.product,
+                "contract": result.contract,
+                "direction": result.direction,
+                "confidence": result.confidence,
+            }
+            for result in article.analysis_results
+        ],
     )
 
     # 3. 调用 LLM（含重试）
@@ -118,31 +127,74 @@ def infer_article(
     # 4. 解析 JSON
     parsed, errors = parse_llm_json(raw_response)
 
-    # 5. 判定
-    product = parsed.get("product")
-    direction = parsed.get("direction")
-    reason = parsed.get("reason", "")
-    confidence = parsed.get("confidence", 0.0)
-    need_manual = confidence < config.manual_review_threshold
-
     elapsed = int((time.monotonic() - start_time) * 1000)
 
-    # 关键字段缺失 → 低置信入库
-    if not product or not direction:
-        logger.warning("LLM 输出关键字段缺失 article_id=%s: errors=%s", article_id, errors)
-        need_manual = True
+    # 5. 判定和规范化；关键字段缺失的条目低置信入库，供人工复核
+    infer_items: list[InferItem] = []
+    save_items: list[dict] = []
+    raw_items = parsed.get("results") or []
+    for item in raw_items:
+        product = item.get("product") or "未知"
+        direction = item.get("direction") or "中性"
+        reason = item.get("reason", "")
+        confidence = float(item.get("confidence") or 0.0)
+        need_manual = confidence < config.manual_review_threshold or product == "未知" or not item.get("direction")
+        infer_item = InferItem(
+            product=product,
+            contract=item.get("contract"),
+            direction=direction,
+            reason=reason,
+            confidence=confidence,
+            need_manual_review=need_manual,
+        )
+        infer_items.append(infer_item)
+        save_items.append(
+            {
+                "product": product,
+                "contract": item.get("contract"),
+                "direction": direction,
+                "reason": reason or (f"LLM 推理结果。解析问题: {'; '.join(errors)}" if errors else ""),
+                "confidence": confidence,
+                "analysis_method": "llm",
+                "need_manual_review": need_manual,
+                "model_name": config.model,
+                "llm_duration_ms": elapsed,
+                "llm_retry_count": retry_count,
+                "llm_error_msg": last_error or ("; ".join(errors) if errors else None),
+            }
+        )
+
+    if not save_items:
+        logger.warning("LLM 输出无可保存结果 article_id=%s: errors=%s", article_id, errors)
+        empty_reason = (
+            f"LLM 推理结果不可解析。{' ;'.join(errors)}"
+            if errors
+            else "LLM 未识别到可分析的期货观点，文本可能仅包含目录、导航或免责声明。"
+        )
+        empty_error = "; ".join(errors) if errors else "LLM 返回 results 为空"
+        infer_items = [InferItem(product="未知", direction="中性", confidence=0.0, need_manual_review=True)]
+        save_items = [
+            {
+                "product": "未知",
+                "contract": None,
+                "direction": "中性",
+                "reason": empty_reason,
+                "confidence": 0.0,
+                "analysis_method": "llm",
+                "need_manual_review": True,
+                "model_name": config.model,
+                "llm_duration_ms": elapsed,
+                "llm_retry_count": retry_count,
+                "llm_error_msg": last_error or empty_error,
+            }
+        ]
 
     try:
         # 6. 入库
         repo.update_status(article_id, ArticleProcessingStatus.LLM_INFERRED)
-        repo.save_analysis_result(
-            article_id=article_id,
-            product=product or "未知",
-            direction=direction or "中性",
-            reason=reason or (f"LLM 推理结果。解析问题: {'; '.join(errors)}" if errors else ""),
-            confidence=confidence,
-            analysis_method="llm",
-            need_manual_review=need_manual,
+        repo.save_analysis_results(
+            article_id,
+            save_items,
             mark_stored=True,
         )
 
@@ -153,7 +205,7 @@ def infer_article(
             status="success",
             message=(
                 f"model={config.model} retries={retry_count} "
-                f"product={product} direction={direction} confidence={confidence:.2f}"
+                f"results={len(save_items)} errors={'; '.join(errors) if errors else ''}"
             ),
             duration_ms=elapsed,
         )
@@ -161,14 +213,10 @@ def infer_article(
     except Exception as exc:
         raise _fail(repo, article_id, f"LLM 结果入库失败: {exc}", duration_ms=elapsed) from exc
 
-    logger.info("LLM 推理完成 article_id=%s: %s %s %.2f", article_id, product, direction, confidence)
+    logger.info("LLM 推理完成 article_id=%s: results=%s", article_id, len(save_items))
 
     return InferResult(
-        product=product,
-        direction=direction,
-        reason=reason,
-        confidence=confidence,
-        need_manual_review=need_manual,
+        results=infer_items,
         model=config.model,
         duration_ms=elapsed,
         retry_count=retry_count,

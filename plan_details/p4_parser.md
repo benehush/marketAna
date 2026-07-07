@@ -144,3 +144,81 @@ pn04 实现文章文件解析模块，支持 PDF（PyMuPDF）、HTML（Beautiful
 | 全量测试 | ✅ 18 个测试用例全部通过 |
 
 **总结**：pn04 已完成多格式文章解析模块的核心实现。PDF、HTML、图片三类解析器均可独立工作，表格内容被转为 Markdown 保留结构化信息。模块通过 `ArticleRepository` 接口写入数据库，状态流转（0→1 或 0→-1）和 task_log 记录完整。后续 pn05 Cleaner 可直接消费 `article_texts.raw_text`。
+
+
+
+# pn04 Parser 优化方案：确定性解析 + 可选 AI 图文增强
+
+## Summary
+将 pn04 从“按格式抽文本”升级为“文档容器解析器”：PDF/HTML/图片统一输出带来源标记的 `raw_text`，优先使用确定性解析和 OCR，复杂图表/图片正文再用可选 AI 增强。默认策略采用用户确认的“可选增强”：AI 失败不阻塞解析；AI 生成内容允许写入 `article_texts.raw_text`，但必须带明确标记，方便 pn05 清洗和排错。
+
+## Key Changes
+- 保持 `parse_article(article, session, config, base_dir)` 对外入口不变，继续成功写入 `article_texts.raw_text`、`status=1`，失败写 `error_msg`、`status=-1`。
+- 扩展 `ParseConfig`：
+  - `html_extract_embedded_images=True`
+  - `image_ocr_engine="tesseract"`，预留 `"paddle"` 但默认不强依赖
+  - `parser_ai_enabled=False`
+  - `parser_ai_model=None`
+  - `parser_ai_max_images=3`
+  - `min_meaningful_text_chars=200`
+- 统一 `raw_text` 输出格式：
+  ```text
+  # 文档标题
+  来源文件: ...
+  解析器: html/pdf/image
+
+  ## 正文文本
+  ...
+
+  ## 表格数据
+  <Markdown 表格 + 简短自然语言描述>
+
+  ## 图片OCR文本: <relative image path>
+  ...
+
+  ## AI图表解读: <relative image path>
+  ...
+  ```
+- AI 内容必须只用于补充图表、长图、扫描图、正文图片；不能覆盖确定性抽取文本。
+
+## Implementation Changes
+- HTML 解析：
+  - 先删除 `script/style/nav/footer/header/form` 等噪声节点。
+  - 用候选块评分选择正文容器，而不是简单命中第一个 `content/body`：评分因素包括中文字符数、段落数、表格数、正文关键词、链接密度低、导航关键词少。
+  - 对正文容器内的 `<table>` 转 Markdown；对 `<img>` 解析相对路径，过滤 logo/icon/二维码等小图，保留大图、长图、正文图。
+  - 对浙商样例这种 `<div class="con_p"><img ...></div>`，必须把 `img_folder/*.png` 作为正文资产进入 OCR/AI 增强。
+- PDF 解析：
+  - 继续用 PyMuPDF 按页抽文本，保留 `## Page N`。
+  - 低文本页走 OCR fallback。
+  - 表格继续用 `page.find_tables()`，转 Markdown；抽取失败时不阻塞正文文本。
+- 图片解析：
+  - 默认使用 Tesseract；大长图先按高度切片 OCR，再按顺序拼接，避免 1785x9611 这类长图识别质量差或超时。
+  - 图片预处理增加白底合成、灰度、对比度、放大、可选二值化。
+- AI 增强：
+  - 新增 pn04 内部 AI 增强器，复用 pn07 的 OpenAI 兼容配置。
+  - 仅当 `parser_ai_enabled=True` 且模型配置可用时运行。
+  - 输入为 OCR 文本 + 图片；输出固定为 Markdown 段落，包含“主要品种/方向线索/表格或图表关键信息/无法确认的信息”。
+  - AI 调用失败、超时、未配置时，只记录 task_log warning，不标记解析失败。
+- Repository/API 不改表结构；`raw_text` 继续作为 pn05 输入，`metadata` 暂不入库。
+
+## Test Plan
+- 单元测试：
+  - HTML 正文候选评分能避开导航/页脚，命中正文容器。
+  - HTML 内嵌图片路径能从相对路径解析到本地文件。
+  - 长图切片 OCR 按顺序拼接。
+  - HTML/PDF 表格输出 Markdown。
+  - AI 未配置或调用失败时解析仍成功。
+- 真实样例验收：
+  - `data/20250401/东海期货_323471.PDF`：解析结果包含“研究所晨会观点精萃”、页码、宏观/股指/贵金属/钢材等正文段落。
+  - `data/20250401/323354/浙商期货_323354_0.html`：解析结果不能只剩免责声明/客服/上一篇下一篇，必须包含正文图片 OCR 或 AI 图表解读段。
+  - 含表格 HTML/PDF：输出含 Markdown 表格和自然语言表格说明。
+  - 损坏文件、不支持格式、缺失内嵌图片：失败或降级行为符合预期，并写入 task_log。
+- 命令：
+  - `UV_CACHE_DIR=/tmp/uv-cache uv run pytest pn04/ -v`
+  - 额外增加真实样例 smoke test，可跳过 AI 调用，AI 部分用 mock。
+
+## Assumptions
+- 默认 OCR 使用当前依赖里的 Tesseract；PaddleOCR 作为后续可插拔引擎，不在本轮强制引入新依赖。
+- AI 是可选增强，不是 parser 成败条件。
+- `raw_text` 可以包含带标题标记的 OCR/AI 补充段，pn05 后续负责去噪和规范化。
+- 不新增数据库字段；如以后需要保存解析 metadata，再单独设计迁移。

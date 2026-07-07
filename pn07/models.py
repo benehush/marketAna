@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 class LLMConfig:
     """LLM 推理配置，默认从 Settings 读取。"""
 
+    provider: str = "openai"
     api_key: str = ""
     base_url: str = ""
     model: str = ""
@@ -23,6 +24,8 @@ class LLMConfig:
 
     @property
     def is_configured(self) -> bool:
+        if self.provider.lower() == "wenhua":
+            return bool(self.base_url)
         return bool(self.api_key and self.base_url)
 
     @classmethod
@@ -32,6 +35,7 @@ class LLMConfig:
 
         s = get_settings()
         return cls(
+            provider=(s.llm_provider or "openai").lower(),
             api_key=s.llm_api_key or "",
             base_url=s.llm_base_url or "",
             model=s.llm_model or "",
@@ -40,10 +44,24 @@ class LLMConfig:
 
 
 @dataclass
+class InferItem:
+    """单个品种的 LLM 推理结果。"""
+
+    product: str | None = None
+    contract: str | None = None
+    direction: str | None = None
+    reason: str = ""
+    confidence: float = 0.0
+    need_manual_review: bool = False
+
+
+@dataclass
 class InferResult:
     """LLM 推理结果。"""
 
+    results: list[InferItem] = field(default_factory=list)
     product: str | None = None
+    contract: str | None = None
     direction: str | None = None
     reason: str = ""
     confidence: float = 0.0
@@ -56,7 +74,17 @@ class InferResult:
 
     @property
     def ok(self) -> bool:
-        return self.product is not None and self.direction is not None
+        return bool(self.results) or (self.product is not None and self.direction is not None)
+
+    def __post_init__(self) -> None:
+        if self.results and self.product is None:
+            primary = max(self.results, key=lambda item: item.confidence)
+            self.product = primary.product
+            self.contract = primary.contract
+            self.direction = primary.direction
+            self.reason = primary.reason
+            self.confidence = primary.confidence
+            self.need_manual_review = any(item.need_manual_review for item in self.results)
 
     def summary(self) -> str:
         return (

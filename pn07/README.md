@@ -38,11 +38,15 @@ print(result.need_manual_review) # False
 在 `.env` 中设置：
 
 ```env
-LLM_API_KEY=sk-xxx
-LLM_BASE_URL=https://api.openai.com
-LLM_MODEL=gpt-4o-mini
+LLM_PROVIDER=wenhua
+LLM_API_KEY=
+LLM_BASE_URL=https://swarm.wenhua.com.cn/aiservice/api/ShiXi/GetContent
+LLM_MODEL=wenhua-shixi
 LLM_TIMEOUT_SECONDS=30
 ```
+
+`LLM_PROVIDER=openai` 时仍使用 OpenAI 兼容接口 `/v1/chat/completions`；
+`LLM_PROVIDER=wenhua` 时使用文华 `GetContent` 接口，并按 SSE 流式响应拼接 `choices[].delta.content`，直到 `finish_reason="stop"`。
 
 ## JSON 解析能力
 

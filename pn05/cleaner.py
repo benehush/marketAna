@@ -13,13 +13,7 @@ import time
 from typing import Any
 
 from pn05.models import CleanConfig, CleanResult
-from pn05.normalizer import (
-    detect_and_clean_encoding,
-    normalize_fullwidth,
-    normalize_whitespace,
-    remove_html_residue,
-)
-from pn05.noise_rules import filter_noise_lines, filter_noise_regex
+from pn05.structured_cleaner import clean_text
 
 logger = logging.getLogger(__name__)
 
@@ -74,38 +68,11 @@ def clean_article(
     result = CleanResult(raw_length=raw_length)
 
     try:
-        # 2. 编码检测与修复
-        text = detect_and_clean_encoding(raw_text)
-
-        # 3. HTML 残留移除
-        if config.remove_html_residue:
-            text = remove_html_residue(text)
-
-        # 4. 噪声行过滤
-        if config.filter_noise_lines:
-            lines = text.split("\n")
-            lines, noise_removed = filter_noise_lines(lines)
-            text = "\n".join(lines)
-            result.noise_lines_removed = noise_removed
-
-            # 正则段落模式
-            text, regex_removed = filter_noise_regex(text)
-            result.noise_lines_removed += (1 if regex_removed > 0 else 0)
-
-        # 5. 低密度块过滤（页眉/页脚）
-        if config.filter_low_density:
-            text, low_density_chars = _filter_low_density(text, config)
-            result.low_density_removed = low_density_chars
-
-        # 6. 空白规范化 + 全半角
-        if config.normalize_whitespace:
-            text = normalize_whitespace(text)
-        if config.normalize_fullwidth:
-            text = normalize_fullwidth(text)
-
-        # 7. 后处理：去除首尾空白 + 合并多余空行
-        text = text.strip()
-        text = re.sub(r"\n{3,}", "\n\n", text)
+        # 2-7. 编码修复、模板分区、噪声过滤、数字图表噪声压制、格式化输出
+        text, clean_stats = clean_text(raw_text, config)
+        result.noise_lines_removed = clean_stats.noise_lines_removed
+        result.numeric_blocks_removed = clean_stats.numeric_blocks_removed
+        result.low_density_removed = clean_stats.low_density_removed
 
         cleaned_length = len(text)
         result.cleaned_length = cleaned_length
@@ -120,7 +87,9 @@ def clean_article(
 
         # 空结果检查
         if not text.strip():
-            raise ValueError("清洗后文本为空")
+            raise _handle_failure(repo, article_id, "清洗后文本为空")
+        if not _has_analyzable_content(text):
+            raise _handle_failure(repo, article_id, "清洗后未发现可分析正文，可能仅包含目录、导航或文档信息")
 
         # 截断保护
         if len(text) > config.max_text_length:
@@ -186,6 +155,33 @@ def _filter_low_density(text: str, config: CleanConfig) -> tuple[str, int]:
             kept.append(para)
 
     return "\n\n".join(kept), removed_chars
+
+
+def _has_analyzable_content(text: str) -> bool:
+    """Reject outputs that only contain metadata, headings, navigation, or report links."""
+    semantic_hints = (
+        "观点", "逻辑", "建议", "操作", "策略", "展望", "预测", "预计", "预期",
+        "价格", "上涨", "下跌", "上行", "下行", "偏强", "偏弱", "震荡",
+        "库存", "需求", "供应", "成本", "利润", "基差", "现货", "期货",
+        "利多", "利空", "支撑", "压力", "风险", "关注",
+    )
+    content_lines: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("#"):
+            continue
+        if line.startswith(("来源文件:", "解析器:")):
+            continue
+        content_lines.append(line)
+
+    content = "\n".join(content_lines)
+    if not content:
+        return False
+    if any(hint in content for hint in semantic_hints):
+        return True
+    return len(re.findall(r"[一-鿿]", content)) >= 30
 
 
 def _handle_failure(

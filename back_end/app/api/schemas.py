@@ -1,3 +1,8 @@
+"""
+定义 Pydantic 请求校验模型（`ConfirmResultRequest`、`TaskRunRequest`）
+和工具函数（`datetime_to_iso`）
+
+"""
 from datetime import datetime
 
 from pydantic import BaseModel, Field

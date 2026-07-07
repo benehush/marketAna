@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import type { ProductItem, Direction } from '../../api/types'
 import { DIRECTION_CONFIG } from '../../api/types'
 
+const router = useRouter()
 const props = defineProps<{
   product: ProductItem
 }>()
@@ -17,6 +19,10 @@ function confidenceColor(confidence: number): string {
   if (confidence >= 0.7) return '#27ae60'
   if (confidence >= 0.5) return '#f39c12'
   return '#e74c3c'
+}
+
+function goToArticle(articleId: number) {
+  router.push(`/articles/${articleId}`)
 }
 </script>
 
@@ -46,6 +52,7 @@ function confidenceColor(confidence: number): string {
           v-for="(pred, i) in product.predictions"
           :key="i"
           class="prediction-row"
+          @click.stop="goToArticle(pred.article_id)"
         >
           <div class="pred-left">
             <span
@@ -129,7 +136,14 @@ function confidenceColor(confidence: number): string {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  padding: 8px 6px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.prediction-row:hover {
+  background: #f5f6fa;
 }
 
 .prediction-row + .prediction-row {

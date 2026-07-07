@@ -27,6 +27,7 @@ from pn05.normalizer import (
     detect_and_clean_encoding,
 )
 from pn05.noise_rules import filter_noise_lines, filter_noise_regex
+from pn05.structured_cleaner import clean_text
 
 
 # ---- Fixtures ----
@@ -154,6 +155,21 @@ def test_filter_noise_separator_line():
     assert removed == 1
 
 
+def test_filter_noise_website_chrome():
+    lines = [
+        "无障碍浏览",
+        "正文观点：聚乙烯价格中枢有望下降。",
+        "上一篇：【PP日报20250402】",
+        "客服热线 400-700-5186",
+        "下载APP",
+    ]
+    kept, removed = filter_noise_lines(lines)
+    joined = "\n".join(kept)
+    assert removed == 4
+    assert "聚乙烯" in joined
+    assert "上一篇" not in joined
+
+
 # ---- filter_noise_regex ----
 
 def test_filter_disclaimer_paragraph():
@@ -220,6 +236,162 @@ def test_clean_full_pipeline(session_factory):
     assert article.status == ArticleProcessingStatus.CLEANED.value
     assert article.text.cleaned_text == cleaned
     assert article.text.cleaned_length == len(cleaned)
+    session2.close()
+
+
+def test_structured_cleaner_outputs_markdown_sections():
+    raw = (
+        "# 【L日报20250402】\n"
+        "来源文件: data/20250403/324783/浙商期货_324783_0.html\n"
+        "解析器: html\n\n"
+        "## 正文文本\n"
+        "无障碍浏览\n"
+        "免责申明: 本报告仅供参考。\n\n"
+        "## 图片OCR文本: img_folder/report.png\n"
+        "[图片分片 1/6]\n"
+        "观点: 聚乙烯震荡下行阶段，后期价格中枢有望下降。\n"
+        "逻辑: 新增装置密集落地，产能压力较大，成本端原油预期偏弱。\n"
+        "01-02 01-24 02-15 03-08 03-30 04-22 05-15\n"
+        "5,000 5,000\n"
+        "12505-C-7900\n\n"
+        "## AI图表解读: img_folder/report.png\n"
+        "主要品种: 聚乙烯。方向线索: 看跌或震荡偏弱。\n"
+    )
+
+    cleaned, stats = clean_text(raw, CleanConfig())
+
+    assert cleaned.startswith("# 【L日报20250402】")
+    assert "## 文档信息" in cleaned
+    assert "## 图文识别正文" in cleaned
+    assert "聚乙烯震荡下行" in cleaned
+    assert "价格中枢有望下降" in cleaned
+    assert "## AI图表解读" in cleaned
+    assert "01-02 01-24" not in cleaned
+    assert "5,000 5,000" not in cleaned
+    assert "12505-C-7900" not in cleaned
+    assert stats.numeric_blocks_removed >= 3
+
+
+def test_structured_cleaner_keeps_semantic_numbers():
+    raw = (
+        "# 螺纹钢日报\n"
+        "解析器: pdf\n\n"
+        "## 正文文本\n"
+        "今日螺纹钢期货主力合约震荡上行，收于 3650 元/吨。\n"
+        "下游补库需求增加，库存压力有所缓解。\n"
+        "01-02 01-24 02-15 03-08 03-30 04-22\n"
+    )
+
+    cleaned, _stats = clean_text(raw, CleanConfig())
+
+    assert "3650 元/吨" in cleaned
+    assert "震荡上行" in cleaned
+    assert "01-02 01-24" not in cleaned
+
+
+def test_structured_cleaner_drops_navigation_only_lines():
+    raw = (
+        "# 晨报\n"
+        "解析器: html\n\n"
+        "## 正文文本\n"
+        "晨报\n"
+        "日报\n"
+        "农产品\n"
+        "能源化工\n"
+        "有色金属\n"
+        "交易策略\n"
+        "尿素日报20250401\n"
+        "尿素库存下降，现货价格震荡偏强。\n"
+    )
+
+    cleaned, _stats = clean_text(raw, CleanConfig())
+
+    assert "尿素库存下降" in cleaned
+    assert "\n农产品\n" not in cleaned
+    assert "\n能源化工\n" not in cleaned
+    assert "尿素日报20250401" not in cleaned
+
+
+def test_clean_article_rejects_navigation_only_content(session_factory):
+    session = session_factory()
+    raw = (
+        "# 晨报\n"
+        "来源文件: data/example.html\n"
+        "解析器: html\n\n"
+        "## 正文文本\n"
+        "晨报\n"
+        "日报\n"
+        "农产品\n"
+        "能源化工\n"
+        "有色金属\n"
+        "黑色金属\n"
+        "金融期货\n"
+        "周报\n"
+        "月报\n"
+        "年报\n"
+        "交易策略\n"
+        "尿素日报20250331\n"
+        "尿素日报20250327\n"
+        "尿素日报20250401\n"
+    )
+    aid = _create_article_with_raw(session, raw)
+    session.close()
+
+    session2 = session_factory()
+    with pytest.raises(ValueError, match="未发现可分析正文"):
+        clean_article(aid, session2)
+    session2.commit()
+
+    article = ArticleRepository(session2).get_article_detail(aid)
+    assert article.status == ArticleProcessingStatus.FAILED.value
+    assert "目录、导航" in article.error_msg
+    session2.close()
+
+
+def test_structured_cleaner_table_keeps_headers_drops_numeric_rows():
+    raw = (
+        "# 价格表\n"
+        "解析器: pdf\n\n"
+        "## 表格数据\n"
+        "| 区域 | 现货价格 | 变化 |\n"
+        "| --- | --- | --- |\n"
+        "| 华东 | 3650 | +20 |\n"
+        "| 3650 | 3660 | 20 |\n"
+        "01-02 01-24 02-15 03-08 03-30 04-22\n"
+    )
+
+    cleaned, _stats = clean_text(raw, CleanConfig())
+
+    assert "## 表格与数据" in cleaned
+    assert "| 区域 | 现货价格 | 变化 |" in cleaned
+    assert "| 华东 | 3650 | +20 |" in cleaned
+    assert "| 3650 | 3660 | 20 |" not in cleaned
+    assert "01-02 01-24" not in cleaned
+
+
+def test_clean_structured_pipeline_writes_markdown(session_factory):
+    session = session_factory()
+    raw = (
+        "# 【L日报20250402】\n"
+        "来源文件: data/20250403/324783/浙商期货_324783_0.html\n"
+        "解析器: html\n\n"
+        "## 图片OCR文本: img_folder/report.png\n"
+        "观点: 聚乙烯震荡下行阶段，后期价格中枢有望下降。\n"
+        "01-02 01-24 02-15 03-08 03-30 04-22 05-15\n"
+    )
+    aid = _create_article_with_raw(session, raw)
+    session.close()
+
+    session2 = session_factory()
+    cleaned = clean_article(aid, session2)
+    session2.commit()
+
+    assert "## 图文识别正文" in cleaned
+    assert "聚乙烯" in cleaned
+    assert "01-02 01-24" not in cleaned
+    article = ArticleRepository(session2).get_article_detail(aid)
+    assert article.status == ArticleProcessingStatus.CLEANED.value
+    assert article.text.cleaned_text == cleaned
     session2.close()
 
 

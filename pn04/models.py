@@ -75,6 +75,22 @@ class ParseConfig:
     extract_tables: bool = True
     # 表格 Markdown 前后是否添加自然语言描述
     table_add_description: bool = True
+    # HTML 是否解析正文区域内嵌图片（如研报长图）
+    html_extract_embedded_images: bool = True
+    # 图片 OCR 引擎；默认使用当前依赖中的 Tesseract，PaddleOCR 预留
+    image_ocr_engine: str = "tesseract"
+    # 是否启用 parser 阶段 AI 图表/图片补充解读
+    parser_ai_enabled: bool = False
+    # parser 阶段 AI 模型覆盖值；None 时复用项目 LLM 配置
+    parser_ai_model: str | None = None
+    # 单篇文档最多对多少张图片做 AI 补充解读
+    parser_ai_max_images: int = 3
+    # 判断正文抽取是否足够有意义的最低字符数
+    min_meaningful_text_chars: int = 200
+    # 长图 OCR 时的单片高度，避免超长图片一次性 OCR 效果过差
+    image_slice_height: int = 1800
+    # 是否对 OCR 图片做二值化预处理
+    image_binarize: bool = False
     # 最大解析文本长度（字符），超过则截断并加标记
     max_text_length: int = 500_000
 

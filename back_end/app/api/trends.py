@@ -5,7 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from back_end.app.core.database import get_session
+from back_end.app.core.display import displayable_product_clause
 from back_end.app.core.responses import success_response
+from back_end.app.core.status import ArticleProcessingStatus
 from back_end.app.models import AnalysisResult, Article
 
 router = APIRouter(prefix="/api/trends", tags=["trends"])
@@ -21,6 +23,10 @@ def get_trends(
     stmt = (
         select(AnalysisResult, Article)
         .join(Article, Article.id == AnalysisResult.article_id)
+        .where(
+            Article.status == ArticleProcessingStatus.STORED.value,
+            displayable_product_clause(AnalysisResult.product),
+        )
         .order_by(Article.publish_time.asc(), AnalysisResult.product.asc())
     )
     if product:

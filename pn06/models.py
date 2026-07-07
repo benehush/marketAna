@@ -44,3 +44,53 @@ class RuleResult:
             f"product={self.product} direction={self.direction} "
             f"confidence={self.confidence:.2f} need_llm={self.need_llm}"
         )
+
+
+@dataclass
+class RuleBatchResult:
+    """一篇文章的多品种规则识别结果。"""
+
+    results: list[RuleResult] = field(default_factory=list)
+    need_llm_products: list[str] = field(default_factory=list)
+    analysis_method: str = "rule"
+
+    @property
+    def need_llm(self) -> bool:
+        return bool(self.need_llm_products) or not self.results
+
+    @property
+    def high_confidence_results(self) -> list[RuleResult]:
+        return [result for result in self.results if result.is_high_confidence and not result.need_llm]
+
+    @property
+    def product(self) -> str | None:
+        primary = self.primary_result
+        return primary.product if primary else None
+
+    @property
+    def direction(self) -> str | None:
+        primary = self.primary_result
+        return primary.direction if primary else None
+
+    @property
+    def reason(self) -> str:
+        primary = self.primary_result
+        return primary.reason if primary else ""
+
+    @property
+    def confidence(self) -> float:
+        primary = self.primary_result
+        return primary.confidence if primary else 0.0
+
+    @property
+    def primary_result(self) -> RuleResult | None:
+        if not self.results:
+            return None
+        return max(self.results, key=lambda result: result.confidence)
+
+    def summary(self) -> str:
+        parts = [
+            f"{result.product}:{result.direction}:{result.confidence:.2f}"
+            for result in self.results
+        ]
+        return f"results={';'.join(parts)} need_llm={self.need_llm_products}"
