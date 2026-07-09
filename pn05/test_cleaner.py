@@ -314,6 +314,90 @@ def test_structured_cleaner_drops_navigation_only_lines():
     assert "尿素日报20250401" not in cleaned
 
 
+def test_structured_cleaner_strict_ocr_semantic_filter_removes_low_value_noise():
+    raw = (
+        "# 【L日报20250401】\n"
+        "解析器: html\n\n"
+        "## 图片OCR文本: img_folder/report.png\n"
+        "ASSEW RETA S, Hin eS, (RRA, BATS, mee MS\n"
+        "汪观点: 聚乙烯”震荡下行阶段，后期价格中枢有望下降\n"
+        "汪 ”逻辑:24年年未多套新增装直密集落地，且25年装置投产\n"
+        "产员穿全年，产能压力巨大，同时存量负荷也较高，两者:\n"
+        "乏力，基差回落，成本端原油预期也偏弱，聚乙烯价格重心有望震荡下移。\n"
+        "、会计或税务的最终操作建议，我公司不就观点内容对最终操作建议做出\n"
+        "。所有在本报告中使用的\n"
+        "2 2、I现货价格及价差 8600. 00 8600. 00 8800. 00 0 -200\n"
+        "LLD基准现货价格 华北 2025-03-31 HDPE注塑价格 华东 2025-03-31\n"
+        "数据永源:WIND -全联创 AGRE: BE\n"
+        "焊f工生”。 库序管理。 库存优育，担心PE价格下跌\n"
+        "ue | WEE 款要PE原料，担心PE价格上涨\n"
+        "序预防价格下跌，操作上按比例记出看涨\n"
+        "Laeeaieuban ends eaweTn a | Raee anes es wu os oe ww WEE\n"
+        "请务必阅读正文之后的免责条款和声明\n"
+    )
+
+    cleaned, _stats = clean_text(raw, CleanConfig())
+
+    assert "观点: 聚乙烯" in cleaned
+    assert "逻辑:24年年末多套新增装置密集落地" in cleaned
+    assert "产能压力巨大" in cleaned
+    assert "基差回落" in cleaned
+    assert "原油预期也偏弱" in cleaned
+    assert cleaned.index("观点: 聚乙烯") < cleaned.index("产能压力巨大")
+    assert "ASSEW RETA" not in cleaned
+    assert "Laeeaieuban" not in cleaned
+    assert "会计或税务" not in cleaned
+    assert "所有在本报告中使用" not in cleaned
+    assert "现货价格及价差 8600" not in cleaned
+    assert "LLD基准现货价格" not in cleaned
+    assert "数据永源" not in cleaned
+    assert "焊f工生" not in cleaned
+    assert "WEE" not in cleaned
+    assert "预防价格下跌" not in cleaned
+    assert "免责条款" not in cleaned
+
+
+def test_structured_cleaner_drops_pdf_disclaimer_block_and_fragments():
+    raw = (
+        "# 五矿期货_323248.PDF\n"
+        "来源文件: data/20250401/五矿期货_323248.PDF\n"
+        "解析器: pdf\n\n"
+        "## 正文文本\n"
+        "不锈钢需求表现旺季不旺，预计不锈钢震荡偏弱运行。\n"
+        "吨, 环比增加5144 吨。主力合约持仓量为140.3648 万手，环比减少149742 手。现货市场方面, 螺\n"
+        "吨。 热轧板卷主力合约收盘价为3342 元/吨, 较上一交易日跌32 元/吨（-0.94%）。 当日注册仓\n"
+        "面, 热轧板卷乐从汇总价格为3360 元/吨, 环比减少10 元/吨; 上海汇总价格为3360 元/吨, 环比\n"
+        "商品氛围偏空，成材价格维持弱势震荡格局。\n"
+        "预计成材价格将维持底部震荡走势，关注库存去化速度。\n"
+        "纯碱供应偏宽松，库存压力仍大。\n"
+        "变化至36.62 万手。铁矿石加权持仓量94.88 万手。\n"
+        "五矿期货有限公司是经中国证监会批准设立的期货经营机构，已具备商品期货经纪、金融期货经纪、\n"
+        "资产管理、期货交易咨询等业务资格。\n"
+        "本刊所有信息均建立在可靠的资料来源基础上。\n"
+        "文中所提及的任何观点都仅供参考，不构成买卖建议。\n"
+        "未经书面许可，任何人不得复制、传播或存储。\n"
+        "研究报告不代表协会观点，仅供交流使用，不构成任何投资建议。\n"
+        "深圳市南山区粤海街道3165号五矿金融大厦13-16层\n"
+    )
+
+    cleaned, _stats = clean_text(raw, CleanConfig())
+
+    assert "预计不锈钢震荡偏弱运行" in cleaned
+    assert "商品氛围偏空，成材价格维持弱势震荡格局" in cleaned
+    assert "预计成材价格将维持底部震荡走势" in cleaned
+    assert "关注库存去化速度" in cleaned
+    assert "供应偏宽松" in cleaned
+    assert "吨, 环比增加5144 吨" not in cleaned
+    assert "当日注册仓" not in cleaned
+    assert "环比变化至36.62 万手" not in cleaned
+    assert "期货有限公司是经中国证监会批准" not in cleaned
+    assert "本刊所有信息" not in cleaned
+    assert "不构成买卖建议" not in cleaned
+    assert "未经书面许可" not in cleaned
+    assert "研究报告不代表协会观点" not in cleaned
+    assert "金融大厦" not in cleaned
+
+
 def test_clean_article_rejects_navigation_only_content(session_factory):
     session = session_factory()
     raw = (
@@ -534,6 +618,94 @@ def test_refiner_failure_is_non_blocking_and_does_not_overwrite(session_factory,
         TaskLog.stage == "refiner",
         TaskLog.status == "failed",
     )).first() is not None
+    session.close()
+
+
+def test_refiner_rejects_explanatory_or_corrective_output(session_factory, monkeypatch):
+    session = session_factory()
+    aid = _create_article_with_raw(session, "工业硅现货端报价11050元/吨，价格震荡偏弱。")
+    clean_article(aid, session)
+    repo = ArticleRepository(session)
+    repo.save_refined_text(aid, "已有精修文本")
+    session.commit()
+
+    class CorrectingClient:
+        def __init__(self, config):
+            self.config = config
+
+        def chat(self, messages, *, retries=None):
+            return "注：原文可能有误。更正：工业硅现货端报价10250元/吨，价格震荡偏弱。"
+
+    monkeypatch.setattr("pn07.llm_client.LLMAPIClient", CorrectingClient)
+
+    refined = refine_article(
+        aid,
+        session,
+        config=LLMConfig(
+            provider="openai",
+            api_key="test-key",
+            base_url="https://example.test",
+            model="fake-refiner",
+            max_retries=0,
+        ),
+    )
+    session.commit()
+
+    article = ArticleRepository(session).get_article_detail(aid)
+    assert refined is None
+    assert article.status == ArticleProcessingStatus.CLEANED.value
+    assert article.text.refined_text == "已有精修文本"
+    failed_log = session.scalars(select(TaskLog).where(
+        TaskLog.article_id == aid,
+        TaskLog.stage == "refiner",
+        TaskLog.status == "failed",
+    )).first()
+    assert failed_log is not None
+    assert "输出不安全" in failed_log.message
+    session.close()
+
+
+def test_refiner_rejects_overexpanded_output(session_factory, monkeypatch):
+    session = session_factory()
+    aid = _create_article_with_raw(session, "豆粕库存下降，价格震荡偏强。")
+    clean_article(aid, session)
+    repo = ArticleRepository(session)
+    repo.save_refined_text(aid, "已有精修文本")
+    session.commit()
+
+    class ExpandingClient:
+        def __init__(self, config):
+            self.config = config
+
+        def chat(self, messages, *, retries=None):
+            return "豆粕库存下降，价格震荡偏强。" + "市场情绪有所改善。" * 40
+
+    monkeypatch.setattr("pn07.llm_client.LLMAPIClient", ExpandingClient)
+
+    refined = refine_article(
+        aid,
+        session,
+        config=LLMConfig(
+            provider="openai",
+            api_key="test-key",
+            base_url="https://example.test",
+            model="fake-refiner",
+            max_retries=0,
+        ),
+    )
+    session.commit()
+
+    article = ArticleRepository(session).get_article_detail(aid)
+    assert refined is None
+    assert article.status == ArticleProcessingStatus.CLEANED.value
+    assert article.text.refined_text == "已有精修文本"
+    failed_log = session.scalars(select(TaskLog).where(
+        TaskLog.article_id == aid,
+        TaskLog.stage == "refiner",
+        TaskLog.status == "failed",
+    )).first()
+    assert failed_log is not None
+    assert "输出过长" in failed_log.message
     session.close()
 
 

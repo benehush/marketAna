@@ -37,6 +37,13 @@ class CleanConfig:
     numeric_block_max_cjk_chars: int = 6
     chart_axis_date_count: int = 5
     min_semantic_line_chars: int = 8
+    semantic_line_filter: bool = True
+    strict_ocr_noise_filter: bool = True
+    max_ocr_noise_alpha_ratio: float = 0.45
+    min_ocr_semantic_cjk_chars: int = 6
+    drop_disclaimer_blocks: bool = True
+    drop_pdf_fragment_lines: bool = True
+    pdf_fragment_min_cjk_chars: int = 8
 
     # 输出保护
     max_text_length: int = 500_000       # 最大输出长度（截断保护）
