@@ -25,7 +25,7 @@ class LLMConfig:
     @property
     def is_configured(self) -> bool:
         if self.provider.lower() == "wenhua":
-            return bool(self.base_url)
+            return True  # wenhua 使用固定 URL，无需额外配置
         return bool(self.api_key and self.base_url)
 
     @classmethod

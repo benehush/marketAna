@@ -244,6 +244,45 @@ def test_html_parser_selects_main_content_over_navigation(temp_dir):
     assert "客服中心" not in result.raw_text
 
 
+def test_html_parser_ignores_floating_image_toolbar(temp_dir):
+    """HTML 正文候选评分应避开只有图片的悬浮工具栏。"""
+    html_content = """<!DOCTYPE html>
+<html><body>
+    <div class="inside">
+        <div class="left"><a>首页</a><a>客户服务中心</a><a>研究发展中心</a></div>
+        <div class="right">
+            <div class="t-con">
+                <h2>铜：关税不确定性 铜承压震荡</h2>
+                <div>发布时间：2025-04-01 10:27:05</div>
+                【基本面】隔夜伦铜收9690美元/吨，跌幅0.96%；隔夜沪铜主力2505合约收79650元/吨，跌幅0.83%。<br />
+                宏观方面，美国对等关税政策预期引发担忧，市场避险需求升高，推动美元走强。<br />
+                库存方面，上周伦铜库存下降，沪铜库存亦有所减少。<br />
+                【观点及操作策略】国内高铜价下游消费受抑，仍需警惕消费负反馈风险，日内轻空短线谨慎参与。<br />
+            </div>
+        </div>
+    </div>
+    <div class="cb-box">
+        <div class="weixin"><img src="a.png"></div>
+        <div class="weixin"><img src="b.png"></div>
+        <div class="cont-in-box"><img src="c.png"></div>
+        <div class="f-ser-box"><img src="d.png"></div>
+        <img src="e.png"><img src="f.png">
+    </div>
+</body></html>"""
+    file_path = os.path.join(temp_dir, "btqh_report.html")
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(html_content)
+
+    from pn04.html_parser import HtmlParser
+
+    result = HtmlParser().parse(file_path)
+
+    assert "铜：关税不确定性" in result.raw_text
+    assert "观点及操作策略" in result.raw_text
+    assert "轻空短线谨慎参与" in result.raw_text
+    assert "客户服务中心" not in result.raw_text
+
+
 def test_html_parser_extracts_embedded_report_image(temp_dir, monkeypatch):
     """HTML 正文图片应进入 OCR 段，覆盖浙商长图类页面。"""
     try:

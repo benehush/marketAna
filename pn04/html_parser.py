@@ -251,7 +251,10 @@ class HtmlParser:
                 pass
 
         # 移除常见交互/悬浮工具条，避免正文抽取被客服、返回顶部污染
-        for node in soup.find_all(class_=re.compile(r"(yb_|float|fixed|toolbar|service|客服|erwei|qrcode)", re.I)):
+        for node in soup.find_all(class_=re.compile(
+            r"(yb_|float|fixed|toolbar|service|客服|erwei|qrcode|cb-box|weixin|cont-in-box|f-ser-box)",
+            re.I,
+        )):
             if not self._is_main_content(node):
                 node.decompose()
 
@@ -341,8 +344,10 @@ class HtmlParser:
             ]
         ).lower()
         class_bonus = 0
-        if re.search(r"content|conten|article|post|entry|body|text|detail|main|con_p", class_id):
+        if re.search(r"content|conten|article|post|entry|body|text|detail|main|con_p|t-con", class_id):
             class_bonus = 180
+        elif re.search(r"\bright\b", class_id) and chinese_chars >= 80:
+            class_bonus = 80
         nav_hits = sum(
             text.count(keyword)
             for keyword in [
@@ -352,11 +357,15 @@ class HtmlParser:
         )
         hidden_penalty = 10000 if "display: none" in str(node.get("style", "")).lower() else 0
 
+        image_score = image_count * 900
+        if image_count and table_count == 0 and chinese_chars < 10:
+            image_score = image_count * 20
+
         return (
             chinese_chars
             + paragraph_count * 35
             + table_count * 120
-            + image_count * 900
+            + image_score
             + class_bonus
             - link_density * chinese_chars * 1.2
             - nav_hits * 70

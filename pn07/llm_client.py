@@ -129,8 +129,19 @@ class LLMAPIClient:
 
         raise RuntimeError(f"LLM API 调用失败（已重试 {max_retries} 次）: {last_error}")
 
+    WENHUA_SSE_URL: str = "https://swarm.wenhua.com.cn/aiservice/api/ShiXi/GetContent"
+
     def _chat_wenhua(self, messages: list[dict], *, retries: int | None = None) -> str:
-        """调用文华自定义 SSE 接口并拼接完整回答。"""
+        """调用文华 ShiXi/GetContent SSE 接口并拼接完整回答。
+
+        SSE 流式协议：
+        - 每条数据为一行 JSON，可能带 "data:" 前缀
+        - choices[0].delta.content 为增量文本
+        - finish_reason == "stop" 表示流正常结束
+        - [DONE] 为备选结束信号
+
+        使用 iter_bytes + 行缓冲区确保跨 chunk 的行正确拼接。
+        """
         import httpx
 
         max_retries = retries if retries is not None else self._max_retries
@@ -142,15 +153,15 @@ class LLMAPIClient:
                     "Accept": "text/event-stream",
                     "Content-Type": "application/json",
                 }
-                if self._api_key:
-                    headers["Authorization"] = f"Bearer {self._api_key}"
+
+                stream_timeout = httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=10.0)
 
                 with httpx.stream(
                     "POST",
-                    self._base_url,
+                    self.WENHUA_SSE_URL,
                     json={"content": self._messages_to_content(messages)},
                     headers=headers,
-                    timeout=self._timeout + 10,
+                    timeout=stream_timeout,
                 ) as response:
                     if response.status_code in (401, 403):
                         raise ValueError(f"LLM API 认证失败: HTTP {response.status_code}")
@@ -167,23 +178,49 @@ class LLMAPIClient:
 
                     content_parts: list[str] = []
                     stopped = False
-                    for line in response.iter_lines():
-                        piece, is_stop = self._parse_wenhua_sse_line(line)
+                    line_buffer = ""
+
+                    for chunk in response.iter_bytes():
+                        if not chunk:
+                            continue
+                        chunk_text = chunk.decode("utf-8", errors="ignore")
+                        line_buffer += chunk_text
+
+                        while "\n" in line_buffer:
+                            raw_line, line_buffer = line_buffer.split("\n", 1)
+                            piece, is_stop = self._parse_wenhua_sse_line(raw_line)
+                            if piece:
+                                content_parts.append(piece)
+                            if is_stop:
+                                stopped = True
+                                break
+
+                        if stopped:
+                            break
+
+                    if line_buffer.strip() and not stopped:
+                        piece, is_stop = self._parse_wenhua_sse_line(line_buffer)
                         if piece:
                             content_parts.append(piece)
                         if is_stop:
                             stopped = True
-                            break
 
                     if content_parts:
+                        if not stopped:
+                            logger.warning(
+                                "文华 SSE 流结束但未收到 finish_reason=stop，"
+                                "已收到 %d 个分片，共 %d 字符",
+                                len(content_parts), sum(len(p) for p in content_parts),
+                            )
                         return "".join(content_parts)
                     if stopped:
                         return ""
-                    last_error = "文华 SSE 响应为空或未包含 choices.delta.content"
+                    last_error = "文华 SSE 响应为空"
 
             except httpx.TimeoutException:
-                last_error = f"请求超时 ({self._timeout}s)"
+                last_error = "请求超时 (connect=10s, read=120s)"
                 if attempt < max_retries:
+                    logger.warning("文华 SSE 超时重试 %s/%s", attempt + 1, max_retries)
                     continue
             except httpx.RequestError as exc:
                 last_error = f"网络错误: {exc}"
@@ -206,7 +243,13 @@ class LLMAPIClient:
 
     @staticmethod
     def _parse_wenhua_sse_line(line: str) -> tuple[str, bool]:
-        """解析单行 SSE/JSON 响应，返回 (content_delta, is_stop)。"""
+        """解析单行 SSE/JSON 响应，返回 (content_delta, is_stop)。
+
+        结束判断：
+        1. finish_reason == "stop"  → 正常结束（最可靠）
+        2. [DONE]                    → OpenAI 兼容结束标记
+        3. finish_reason 为其他非空值 → 异常结束（如 "length"/"content_filter"）
+        """
         text = line.strip()
         if not text:
             return "", False
@@ -227,7 +270,15 @@ class LLMAPIClient:
         first = choices[0]
         delta = first.get("delta") or {}
         content = delta.get("content") or ""
-        return str(content), first.get("finish_reason") == "stop"
+
+        finish_reason = first.get("finish_reason")
+        # None 或空 → 未结束；"stop" → 正常结束；其他 → 异常结束
+        is_stop = (finish_reason == "stop")
+
+        if finish_reason and finish_reason != "stop":
+            logger.warning("文华 SSE 异常结束: finish_reason=%s", finish_reason)
+
+        return str(content), is_stop
 
     def health_check(self) -> bool:
         """快速验证 API 配置是否可用（发空消息检查连通性）。"""

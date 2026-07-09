@@ -68,7 +68,7 @@ def build_messages(
                 f"{item.get('direction') or '未定'} "
                 f"confidence={float(item.get('confidence') or 0):.2f}"
             )
-        parts.append("规则引擎候选（请保留高置信结果，补全低置信或遗漏品种）：\n" + "\n".join(lines))
+        paaarts.append("规则引擎候选（请保留高置信结果，补全低置信或遗漏品种）：\n" + "\n".join(lines))
 
     # 正文（可能截断）
     if len(cleaned_text) > max_input_chars:
