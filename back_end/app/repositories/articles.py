@@ -159,6 +159,15 @@ class ArticleRepository(BaseRepository):
         self.session.flush()
         return article_text
 
+    def save_refined_text(self, article_id: int, refined_text: str) -> ArticleText:
+        """保存 LLM 精修后的用户展示文本，不改变文章处理状态。"""
+        self.require_article(article_id)
+        article_text = self._get_or_create_article_text(article_id)
+        article_text.refined_text = refined_text
+        article_text.refined_length = len(refined_text)
+        self.session.flush()
+        return article_text
+
     def save_analysis_result(
         self,
         article_id: int,

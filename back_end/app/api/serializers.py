@@ -89,8 +89,10 @@ def serialize_article_text(article_text: ArticleText | None) -> dict | None:
         "article_id": article_text.article_id,
         "raw_text": article_text.raw_text,
         "cleaned_text": article_text.cleaned_text,
+        "refined_text": article_text.refined_text,
         "raw_length": article_text.raw_length,
         "cleaned_length": article_text.cleaned_length,
+        "refined_length": article_text.refined_length,
         "parser_type": article_text.parser_type,
         "created_at": datetime_to_iso(article_text.created_at),
         "updated_at": datetime_to_iso(article_text.updated_at),
@@ -156,19 +158,17 @@ def build_analysis_evidence(result: AnalysisResult, article_text: ArticleText | 
     raw_text = article_text.raw_text if article_text and article_text.raw_text else ""
 
     search_steps = [
-        ("cleaned_text", cleaned_text, _reason_candidates(summary), "reason"),
-        ("cleaned_text", cleaned_text, _keyword_candidates(result), "keyword"),
-        ("raw_text", raw_text, _reason_candidates(summary), "reason"),
-        ("raw_text", raw_text, _keyword_candidates(result), "keyword"),
+        ("cleaned_text", cleaned_text),
+        ("raw_text", raw_text),
     ]
-    for source, text, candidates, match_type in search_steps:
-        excerpts = _find_evidence_excerpts(text, candidates, source=source, match_type=match_type)
+    for source, text in search_steps:
+        excerpts = _find_evidence_excerpts(text, _evidence_candidates(result), source=source)
         if excerpts:
             return {
                 "summary": summary,
                 "source": source,
                 "excerpts": excerpts,
-                "notes": _match_note(source, match_type),
+                "notes": _match_note(source, _primary_match_type(excerpts)),
             }
 
     fallback_quote = summary or f"{result.product}{result.direction}，置信度 {result.confidence:.2f}"
@@ -196,7 +196,7 @@ def _reason_candidates(reason: str) -> list[str]:
     candidates.extend(
         _compact_text(part)
         for part in re.split(r"[。！？；;，,、\n]", reason)
-        if len(_compact_text(part)) >= 6
+        if len(_compact_text(part)) >= 4
     )
     return _dedupe(candidates)
 
@@ -212,31 +212,61 @@ def _keyword_candidates(result: AnalysisResult) -> list[str]:
     return [item for item in _dedupe(str(value).strip() for value in candidates if value) if item]
 
 
+def _evidence_candidates(result: AnalysisResult) -> list[tuple[str, str, int]]:
+    candidates: list[tuple[str, str, int]] = []
+    for candidate in _reason_candidates(result.reason or ""):
+        candidates.append((candidate, "reason", 20 + min(len(candidate), 60)))
+    for candidate in _keyword_candidates(result):
+        candidates.append((candidate, "keyword", 5 + min(len(candidate), 20)))
+    return _dedupe_candidate_specs(candidates)
+
+
 def _find_evidence_excerpts(
     text: str,
-    candidates: list[str],
+    candidates: list[tuple[str, str, int]],
     *,
     source: str,
-    match_type: str,
     limit: int = 3,
 ) -> list[dict]:
     if not text or not candidates:
         return []
 
-    excerpts: list[dict] = []
-    seen_quotes: set[str] = set()
-    for candidate in candidates:
+    windows: list[dict] = []
+    for candidate, match_type, weight in candidates:
         candidate = _compact_text(candidate)
         if not candidate:
             continue
         index = text.find(candidate)
+        matched_text = candidate
         if index < 0 and len(candidate) > 24:
-            index = text.find(candidate[:24])
+            matched_text = candidate[:24]
+            index = text.find(matched_text)
         if index < 0:
             continue
 
-        start, end = _sentence_window(text, index, index + len(candidate))
-        quote = _compact_text(text[start:end])
+        start, end = _evidence_window(text, index, index + len(matched_text))
+        windows.append(
+            {
+                "score": weight,
+                "start_char": start,
+                "end_char": end,
+                "match_type": match_type,
+                "matched_text": matched_text,
+            }
+        )
+    if not windows:
+        return []
+
+    merged_windows = _merge_evidence_windows(windows)
+    ranked_windows = sorted(
+        merged_windows,
+        key=lambda item: (-item["score"], item["start_char"], item["end_char"]),
+    )
+
+    excerpts: list[dict] = []
+    seen_quotes: set[str] = set()
+    for window in ranked_windows:
+        quote = _compact_text(text[window["start_char"]:window["end_char"]])
         if not quote or quote in seen_quotes:
             continue
         seen_quotes.add(quote)
@@ -244,31 +274,130 @@ def _find_evidence_excerpts(
             {
                 "quote": quote,
                 "source": source,
-                "start_char": start,
-                "end_char": end,
-                "match_type": match_type,
+                "start_char": window["start_char"],
+                "end_char": window["end_char"],
+                "match_type": window["match_type"],
             }
         )
         if len(excerpts) >= limit:
             break
-    return excerpts
+    return sorted(excerpts, key=lambda item: item["start_char"])
 
 
-def _sentence_window(text: str, start: int, end: int, radius: int = 80) -> tuple[int, int]:
-    left_bound = max(0, start - radius)
-    right_bound = min(len(text), end + radius)
-    left_candidates = [text.rfind(mark, 0, start) for mark in "。！？；\n"]
-    left = max(left_candidates)
-    if left == -1 or left < left_bound:
-        left = left_bound
-    else:
-        left += 1
+def _evidence_window(text: str, start: int, end: int, max_chars: int = 360) -> tuple[int, int]:
+    paragraph_start, paragraph_end = _paragraph_window(text, start, end)
+    if paragraph_end - paragraph_start <= max_chars:
+        return paragraph_start, paragraph_end
+    return _sentence_group_window(text, start, end, max_chars=max_chars)
 
-    right_candidates = [idx for mark in "。！？；\n" if (idx := text.find(mark, end)) != -1]
-    right = min(right_candidates) + 1 if right_candidates else right_bound
-    if right > right_bound:
-        right = right_bound
-    return left, right
+
+def _paragraph_window(text: str, start: int, end: int) -> tuple[int, int]:
+    if "\n" in text:
+        line_start = text.rfind("\n", 0, start) + 1
+        previous_blank = text.rfind("\n\n", 0, start)
+        if previous_blank != -1:
+            line_start = previous_blank + 2
+
+        line_end = text.find("\n", end)
+        next_blank = text.find("\n\n", end)
+        if next_blank != -1:
+            line_end = next_blank
+        elif line_end == -1:
+            line_end = len(text)
+
+        line_end = _extend_colon_ending(text, line_end)
+        return _trim_bounds(text, line_start, line_end)
+
+    return _sentence_group_window(text, start, end)
+
+
+def _sentence_group_window(text: str, start: int, end: int, max_chars: int = 360) -> tuple[int, int]:
+    sentences = _sentence_bounds(text)
+    selected_index = None
+    for index, (sentence_start, sentence_end) in enumerate(sentences):
+        if sentence_start <= start < sentence_end or sentence_start < end <= sentence_end:
+            selected_index = index
+            break
+    if selected_index is None:
+        return _trim_bounds(text, max(0, start - max_chars // 2), min(len(text), end + max_chars // 2))
+
+    left = selected_index
+    right = selected_index
+    while right + 1 < len(sentences) and _ends_with_colon(text[sentences[right][0]:sentences[right][1]]):
+        right += 1
+
+    while left > 0 and _is_heading_like(text[sentences[left - 1][0]:sentences[left - 1][1]]):
+        left -= 1
+
+    while right - left + 1 < 3 and right + 1 < len(sentences):
+        candidate_start = sentences[left][0]
+        candidate_end = sentences[right + 1][1]
+        if candidate_end - candidate_start > max_chars:
+            break
+        right += 1
+
+    return _trim_bounds(text, sentences[left][0], sentences[right][1])
+
+
+def _sentence_bounds(text: str) -> list[tuple[int, int]]:
+    bounds: list[tuple[int, int]] = []
+    sentence_start = 0
+    for index, char in enumerate(text):
+        if char in "。！？；\n":
+            sentence_end = index + 1
+            if sentence_end > sentence_start:
+                bounds.append((sentence_start, sentence_end))
+            sentence_start = sentence_end
+    if sentence_start < len(text):
+        bounds.append((sentence_start, len(text)))
+    return bounds or [(0, len(text))]
+
+
+def _merge_evidence_windows(windows: list[dict], gap: int = 24) -> list[dict]:
+    ordered = sorted(windows, key=lambda item: (item["start_char"], item["end_char"]))
+    merged: list[dict] = []
+    for window in ordered:
+        if not merged or window["start_char"] > merged[-1]["end_char"] + gap:
+            merged.append(window.copy())
+            continue
+
+        current = merged[-1]
+        current["end_char"] = max(current["end_char"], window["end_char"])
+        current["score"] += window["score"]
+        if current["match_type"] != "reason" and window["match_type"] == "reason":
+            current["match_type"] = "reason"
+    return merged
+
+
+def _extend_colon_ending(text: str, end: int) -> int:
+    trimmed = text[:end].rstrip()
+    if not _ends_with_colon(trimmed):
+        return end
+    next_line_end = text.find("\n", end + 1)
+    if next_line_end == -1:
+        return len(text)
+    return next_line_end
+
+
+def _trim_bounds(text: str, start: int, end: int) -> tuple[int, int]:
+    while start < end and text[start].isspace():
+        start += 1
+    while end > start and text[end - 1].isspace():
+        end -= 1
+    return start, end
+
+
+def _ends_with_colon(text: str) -> bool:
+    return text.rstrip().endswith(("：", ":"))
+
+
+def _is_heading_like(text: str) -> bool:
+    stripped = text.strip()
+    return bool(stripped) and (
+        _ends_with_colon(stripped)
+        or bool(re.match(r"^[一二三四五六七八九十]+[、.．]", stripped))
+        or bool(re.match(r"^[（(]?[一二三四五六七八九十0-9]+[）).．、]", stripped))
+    )
 
 
 def _compact_text(text: str) -> str:
@@ -283,6 +412,23 @@ def _dedupe(values) -> list[str]:
             seen.add(value)
             result.append(value)
     return result
+
+
+def _dedupe_candidate_specs(candidates: list[tuple[str, str, int]]) -> list[tuple[str, str, int]]:
+    seen: set[tuple[str, str]] = set()
+    result: list[tuple[str, str, int]] = []
+    for candidate, match_type, weight in candidates:
+        key = (candidate, match_type)
+        if candidate and key not in seen:
+            seen.add(key)
+            result.append((candidate, match_type, weight))
+    return result
+
+
+def _primary_match_type(excerpts: list[dict]) -> str:
+    if any(excerpt.get("match_type") == "reason" for excerpt in excerpts):
+        return "reason"
+    return "keyword"
 
 
 def _match_note(source: str, match_type: str) -> str:

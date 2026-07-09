@@ -21,6 +21,7 @@ from back_end.app.repositories.articles import ArticleRepository
 from pn11.pipeline import run_pipeline
 from pn11.batch import batch_process
 from pn11.models import PipelineResult, BatchResult
+from pn07.models import LLMConfig
 
 
 # ---- Fixtures ----
@@ -67,6 +68,13 @@ def _mock_clean(article_id, session, result=None):
     """Mock pn05: 写入 cleaned_text, status→2。"""
     repo = ArticleRepository(session)
     repo.save_cleaned_text(article_id, f"cleaned text for {article_id}")
+    session.commit()
+
+
+def _mock_refine(article_id, session, result=None):
+    """Mock pn05 refiner: 写入 refined_text, status 保持 2。"""
+    repo = ArticleRepository(session)
+    repo.save_refined_text(article_id, f"refined text for {article_id}")
     session.commit()
 
 
@@ -117,6 +125,7 @@ def test_pipeline_full_flow_high_conf(session_factory):
     with (
         patch("pn11.pipeline._run_parser", side_effect=_mock_parse),
         patch("pn11.pipeline._run_cleaner", side_effect=_mock_clean),
+        patch("pn11.pipeline._run_refiner", side_effect=_mock_refine),
         patch("pn11.pipeline._run_rule_engine", side_effect=_mock_rule_high),
     ):
         result = run_pipeline(aid, session2)
@@ -138,6 +147,7 @@ def test_pipeline_full_flow_with_llm(session_factory):
     with (
         patch("pn11.pipeline._run_parser", side_effect=_mock_parse),
         patch("pn11.pipeline._run_cleaner", side_effect=_mock_clean),
+        patch("pn11.pipeline._run_refiner", side_effect=_mock_refine),
         patch("pn11.pipeline._run_rule_engine", side_effect=_mock_rule_low),
         patch("pn11.pipeline._run_llm_infer", side_effect=_mock_llm),
     ):
@@ -147,6 +157,89 @@ def test_pipeline_full_flow_with_llm(session_factory):
     assert result is True
     article = ArticleRepository(session2).get_article(aid)
     assert article.status == ArticleProcessingStatus.STORED.value
+    session2.close()
+
+
+def test_pipeline_runs_refiner_between_cleaner_and_rule_engine(session_factory):
+    session = session_factory()
+    aid = _create_article(session)
+    session.close()
+
+    order = []
+
+    def parse(article, session, result):
+        order.append("parser")
+        _mock_parse(article, session)
+
+    def clean(article_id, session, result):
+        order.append("cleaner")
+        _mock_clean(article_id, session)
+
+    def refine(article_id, session, result):
+        order.append("refiner")
+        _mock_refine(article_id, session)
+
+    def rule(article_id, session, result):
+        order.append("rule_engine")
+        return _mock_rule_high(article_id, session)
+
+    session2 = session_factory()
+    with (
+        patch("pn11.pipeline._run_parser", side_effect=parse),
+        patch("pn11.pipeline._run_cleaner", side_effect=clean),
+        patch("pn11.pipeline._run_refiner", side_effect=refine),
+        patch("pn11.pipeline._run_rule_engine", side_effect=rule),
+    ):
+        result = run_pipeline(aid, session2)
+    session2.commit()
+
+    article = ArticleRepository(session2).get_article_detail(aid)
+    assert result is True
+    assert order == ["parser", "cleaner", "refiner", "rule_engine"]
+    assert article.text.refined_text == f"refined text for {aid}"
+    assert article.status == ArticleProcessingStatus.STORED.value
+    session2.close()
+
+
+def test_pipeline_refiner_failure_does_not_block_rule_engine(session_factory, monkeypatch):
+    session = session_factory()
+    aid = _create_article(session)
+    session.close()
+
+    class FailingClient:
+        def __init__(self, config):
+            self.config = config
+
+        def chat(self, messages, *, retries=None):
+            raise RuntimeError("refiner down")
+
+    monkeypatch.setattr(
+        LLMConfig,
+        "from_settings",
+        classmethod(lambda cls: LLMConfig(
+            provider="openai",
+            api_key="test-key",
+            base_url="https://example.test",
+            model="fake-refiner",
+            max_retries=0,
+        )),
+    )
+    monkeypatch.setattr("pn07.llm_client.LLMAPIClient", FailingClient)
+
+    session2 = session_factory()
+    with (
+        patch("pn11.pipeline._run_parser", side_effect=_mock_parse),
+        patch("pn11.pipeline._run_cleaner", side_effect=_mock_clean),
+        patch("pn11.pipeline._run_rule_engine", side_effect=_mock_rule_high),
+    ):
+        result = run_pipeline(aid, session2)
+    session2.commit()
+
+    article = ArticleRepository(session2).get_article_detail(aid)
+    assert result is True
+    assert article.status == ArticleProcessingStatus.STORED.value
+    assert article.text.refined_text is None
+    assert any(log.stage == "refiner" and log.status == "failed" for log in article.task_logs)
     session2.close()
 
 
@@ -165,6 +258,7 @@ def test_pipeline_resume_from_parsed(session_factory):
     with (
         patch("pn11.pipeline._run_parser") as mock_parser,
         patch("pn11.pipeline._run_cleaner", side_effect=_mock_clean),
+        patch("pn11.pipeline._run_refiner", side_effect=_mock_refine),
         patch("pn11.pipeline._run_rule_engine", side_effect=_mock_rule_high),
     ):
         run_pipeline(a.id, session2)
@@ -195,11 +289,13 @@ def test_pipeline_skip_stored(session_factory):
     with (
         patch("pn11.pipeline._run_parser") as mp,
         patch("pn11.pipeline._run_cleaner") as mc,
+        patch("pn11.pipeline._run_refiner") as mf,
         patch("pn11.pipeline._run_rule_engine") as mr,
     ):
         result = run_pipeline(a.id, session2)
         mp.assert_not_called()
         mc.assert_not_called()
+        mf.assert_not_called()
         mr.assert_not_called()
     assert result is True
     session2.close()
@@ -245,6 +341,7 @@ def test_pipeline_retry_from_failed_parser(session_factory):
     with (
         patch("pn11.pipeline._run_parser", side_effect=_mock_parse),
         patch("pn11.pipeline._run_cleaner", side_effect=_mock_clean),
+        patch("pn11.pipeline._run_refiner", side_effect=_mock_refine),
         patch("pn11.pipeline._run_rule_engine", side_effect=_mock_rule_high),
     ):
         result = run_pipeline(a.id, session2)
@@ -306,11 +403,11 @@ def test_pipeline_result_summary():
     r = PipelineResult(
         article_id=1, success=True,
         start_status=0, final_status=5,
-        stages_run=["parser", "cleaner", "rule_engine"],
+        stages_run=["parser", "cleaner", "refiner", "rule_engine"],
         total_duration_ms=350,
     )
     assert "OK" in r.summary()
-    assert "parser→cleaner→rule_engine" in r.summary()
+    assert "parser→cleaner→refiner→rule_engine" in r.summary()
 
 
 # ---- BatchResult ----

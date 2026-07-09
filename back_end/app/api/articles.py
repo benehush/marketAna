@@ -84,8 +84,8 @@ def serialize_frontend_article(article) -> dict:
             contract = f"{result.contract} " if result.contract else ""
             parts.append(f"{result.product}{contract}{result.direction} {result.confidence:.2f}")
         summary = "；".join(parts)
-    elif article_text and article_text.cleaned_text:
-        summary = article_text.cleaned_text[:120]
+    elif article_text and (article_text.refined_text or article_text.cleaned_text):
+        summary = (article_text.refined_text or article_text.cleaned_text)[:120]
 
     return {
         "id": article.id,

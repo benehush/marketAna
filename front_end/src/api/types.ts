@@ -86,8 +86,10 @@ export interface ArticleDetail {
   text: {
     raw_text: string | null
     cleaned_text: string | null
+    refined_text: string | null
     raw_length: number
     cleaned_length: number
+    refined_length: number
     parser_type: string | null
   } | null
   analysis_result: {

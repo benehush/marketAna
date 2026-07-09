@@ -69,7 +69,7 @@ class LLMAPIClient:
 
         for attempt in range(max_retries + 1):
             try:
-                url = f"{self._base_url}/v1/chat/completions"
+                url = self._openai_url("chat/completions")
                 headers = {
                     "Authorization": f"Bearer {self._api_key}",
                     "Content-Type": "application/json",
@@ -234,9 +234,16 @@ class LLMAPIClient:
             return True
         try:
             import httpx
-            url = f"{self._base_url}/v1/models"
+            url = self._openai_url("models")
             headers = {"Authorization": f"Bearer {self._api_key}"}
             resp = httpx.get(url, headers=headers, timeout=10)
             return resp.status_code == 200
         except Exception:
             return False
+
+    def _openai_url(self, path: str) -> str:
+        """Build OpenAI-compatible endpoint URLs from root or /v1 base_url."""
+        base_url = self._base_url.rstrip("/")
+        if base_url.endswith("/v1"):
+            return f"{base_url}/{path.lstrip('/')}"
+        return f"{base_url}/v1/{path.lstrip('/')}"

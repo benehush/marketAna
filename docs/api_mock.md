@@ -367,7 +367,7 @@ Empty response:
 - `source` 取 `articles.source`，为空时可用 `articles.company`。
 - `company` 取 `articles.company`，为空时可用空字符串。
 - `publish_time` 当前前端 mock 使用日期字符串 `YYYY-MM-DD`；建议真实接口也返回日期部分，避免页面显示过长。
-- `summary` 可先取 `analysis_results.reason`，没有分析结果时取 `article_texts.cleaned_text` 前 80-120 字。
+- `summary` 可先取 `analysis_results.reason`，没有分析结果时优先取 `article_texts.refined_text`，再回退 `article_texts.cleaned_text` 前 80-120 字。
 - `url` 可映射 `articles.file_url`。当前组件尚未渲染 `url`，但类型已预留。
 
 ## 7. Current Frontend Gaps
@@ -438,8 +438,10 @@ Empty response:
       "article_id": 101,
       "raw_text": "原始正文...",
       "cleaned_text": "清洗后正文...",
+      "refined_text": "精修后展示正文...",
       "raw_length": 2034,
       "cleaned_length": 1680,
+      "refined_length": 1520,
       "parser_type": "html",
       "created_at": "2026-07-02T09:06:00",
       "updated_at": "2026-07-02T09:07:00"

@@ -388,6 +388,31 @@ def test_wenhua_sse_line_parser():
     assert stopped is True
 
 
+def test_openai_compatible_base_url_accepts_v1_suffix():
+    client = LLMAPIClient(
+        LLMConfig(
+            api_key="sk-test",
+            base_url="https://api.siliconflow.cn/v1",
+            model="Pro/zai-org/GLM-4.7",
+        )
+    )
+
+    assert client._openai_url("chat/completions") == "https://api.siliconflow.cn/v1/chat/completions"
+    assert client._openai_url("models") == "https://api.siliconflow.cn/v1/models"
+
+
+def test_openai_compatible_base_url_accepts_service_root():
+    client = LLMAPIClient(
+        LLMConfig(
+            api_key="sk-test",
+            base_url="https://api.siliconflow.cn",
+            model="Pro/zai-org/GLM-4.7",
+        )
+    )
+
+    assert client._openai_url("chat/completions") == "https://api.siliconflow.cn/v1/chat/completions"
+
+
 def test_wenhua_chat_stream(monkeypatch):
     class FakeResponse:
         status_code = 200

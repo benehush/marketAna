@@ -27,7 +27,9 @@ from pn05.normalizer import (
     detect_and_clean_encoding,
 )
 from pn05.noise_rules import filter_noise_lines, filter_noise_regex
+from pn05.refiner import refine_article
 from pn05.structured_cleaner import clean_text
+from pn07.models import LLMConfig
 
 
 # ---- Fixtures ----
@@ -448,6 +450,91 @@ def test_clean_task_log(session_factory):
     assert len(logs) == 1
     assert "raw=" in logs[0].message
     session2.close()
+
+
+def test_refiner_writes_refined_text_and_preserves_cleaned_text(session_factory, monkeypatch):
+    session = session_factory()
+    aid = _create_article_with_raw(session, "螺纹钢价格上涨。")
+    cleaned = clean_article(aid, session)
+    session.commit()
+
+    class FakeClient:
+        def __init__(self, config):
+            self.config = config
+
+        def chat(self, messages, *, retries=None):
+            assert "cleaned_text" in messages[1]["content"]
+            return "螺纹钢价格上涨，市场整体表现偏强。"
+
+    monkeypatch.setattr("pn07.llm_client.LLMAPIClient", FakeClient)
+
+    refined = refine_article(
+        aid,
+        session,
+        config=LLMConfig(
+            provider="openai",
+            api_key="test-key",
+            base_url="https://example.test",
+            model="fake-refiner",
+            max_retries=0,
+        ),
+    )
+    session.commit()
+
+    article = ArticleRepository(session).get_article_detail(aid)
+    assert refined == "螺纹钢价格上涨，市场整体表现偏强。"
+    assert article.text.cleaned_text == cleaned
+    assert article.text.refined_text == refined
+    assert article.text.refined_length == len(refined)
+    assert article.status == ArticleProcessingStatus.CLEANED.value
+    assert session.scalars(select(TaskLog).where(
+        TaskLog.article_id == aid,
+        TaskLog.stage == "refiner",
+        TaskLog.status == "success",
+    )).first() is not None
+    session.close()
+
+
+def test_refiner_failure_is_non_blocking_and_does_not_overwrite(session_factory, monkeypatch):
+    session = session_factory()
+    aid = _create_article_with_raw(session, "豆粕库存下降，价格震荡偏强。")
+    clean_article(aid, session)
+    repo = ArticleRepository(session)
+    repo.save_refined_text(aid, "已有精修文本")
+    session.commit()
+
+    class FailingClient:
+        def __init__(self, config):
+            self.config = config
+
+        def chat(self, messages, *, retries=None):
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr("pn07.llm_client.LLMAPIClient", FailingClient)
+
+    refined = refine_article(
+        aid,
+        session,
+        config=LLMConfig(
+            provider="openai",
+            api_key="test-key",
+            base_url="https://example.test",
+            model="fake-refiner",
+            max_retries=0,
+        ),
+    )
+    session.commit()
+
+    article = ArticleRepository(session).get_article_detail(aid)
+    assert refined is None
+    assert article.status == ArticleProcessingStatus.CLEANED.value
+    assert article.text.refined_text == "已有精修文本"
+    assert session.scalars(select(TaskLog).where(
+        TaskLog.article_id == aid,
+        TaskLog.stage == "refiner",
+        TaskLog.status == "failed",
+    )).first() is not None
+    session.close()
 
 
 def test_clean_ratio_tracking(session_factory):

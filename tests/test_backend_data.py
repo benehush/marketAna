@@ -75,6 +75,10 @@ def test_repository_status_flow_failure_log_and_result_idempotency(session_facto
     assert article.status == ArticleProcessingStatus.PARSED
     repository.save_cleaned_text(article.id, "清洗文本")
     assert article.status == ArticleProcessingStatus.CLEANED
+    repository.save_refined_text(article.id, "精修文本")
+    assert article.status == ArticleProcessingStatus.CLEANED
+    assert article.text.refined_text == "精修文本"
+    assert article.text.refined_length == len("精修文本")
     repository.update_status(article.id, ArticleProcessingStatus.RULE_ANALYZED)
     repository.update_status(article.id, ArticleProcessingStatus.LLM_INFERRED)
     repository.save_analysis_result(
@@ -188,6 +192,7 @@ def test_api_handlers_return_contracts_for_articles_trends_and_confirm(session_f
     )
     repository.save_raw_text(article.id, "raw", parser_type="html")
     repository.save_cleaned_text(article.id, "cleaned")
+    repository.save_refined_text(article.id, "refined")
     result = repository.save_analysis_result(
         article.id,
         product="豆粕",
@@ -227,6 +232,8 @@ def test_api_handlers_return_contracts_for_articles_trends_and_confirm(session_f
 
     detail_body = get_article_detail(article.id, session=api_session)
     assert detail_body["data"]["text"]["cleaned_text"] == "cleaned"
+    assert detail_body["data"]["text"]["refined_text"] == "refined"
+    assert detail_body["data"]["text"]["refined_length"] == len("refined")
     assert detail_body["data"]["task_logs"][0]["stage"] == "llm"
     assert len(detail_body["data"]["analysis_results"]) == 1
     assert detail_body["data"]["analysis_result"]["product"] == "豆粕"
@@ -388,6 +395,39 @@ def test_article_detail_builds_traceable_evidence_from_cleaned_text(session_fact
     assert reason in evidence["excerpts"][0]["quote"]
     assert evidence["excerpts"][0]["start_char"] == 0
     assert evidence["excerpts"][0]["end_char"] > evidence["excerpts"][0]["start_char"]
+    session.close()
+
+
+def test_article_detail_merges_neighboring_evidence_phrases(session_factory) -> None:
+    session = session_factory()
+    repository = ArticleRepository(session)
+    article = repository.create_article(title="聚乙烯证据")
+    cleaned_text = (
+        "产员穿全年，产能压力巨大，同时存量负荷也较高，二者：\n"
+        "产能压力巨大，存量负荷较高。\n"
+        "芝力，基差回落，成本端原油预期也偏弱，聚乙烯价格重心有望震荡下移。"
+    )
+    reason = "产能压力巨大，存量负荷较高，基差回落，成本端原油预期偏弱"
+    repository.save_cleaned_text(article.id, cleaned_text)
+    repository.save_analysis_result(
+        article.id,
+        product="LLDPE",
+        direction="看跌",
+        reason=reason,
+        confidence=1.0,
+        analysis_method="llm",
+    )
+    session.commit()
+
+    body = get_article_detail(article.id, session=session)
+    evidence = body["data"]["analysis_result"]["evidence"]
+    quote = evidence["excerpts"][0]["quote"]
+
+    assert len(evidence["excerpts"]) == 1
+    assert evidence["excerpts"][0]["match_type"] == "reason"
+    assert "二者：" in quote
+    assert "产能压力巨大，存量负荷较高。" in quote
+    assert "基差回落，成本端原油预期也偏弱" in quote
     session.close()
 
 

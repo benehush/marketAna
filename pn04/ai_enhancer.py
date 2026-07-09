@@ -2,7 +2,7 @@
 pn04 可选 AI 增强。
 
 该模块只做 parser 阶段的补充解读：当图片/图表 OCR 文本较难直接
-进入规则识别时，用已配置的 OpenAI 兼容 LLM 生成可清洗的 Markdown
+进入规则识别时，用已配置的 OpenAI 兼容 LLM（如 SiliconFlow）生成可清洗的 Markdown
 说明。AI 失败不影响 parser 成功。
 """
 

@@ -106,7 +106,7 @@
 
 ### 3.2 `article_texts`
 
-文章文本表，保存解析后的原始文本和清洗后的文本。
+文章文本表，保存解析后的原始文本、清洗后的分析文本和 LLM 精修后的展示文本。
 
 | 字段 | 类型 | 必填 | 默认值 | 说明 |
 | --- | --- | --- | --- | --- |
@@ -114,8 +114,10 @@
 | `article_id` | `ForeignKey(articles.id)` | 是 | 无 | 关联文章 |
 | `raw_text` | `Text` / MySQL `LONGTEXT` | 否 | `NULL` | 解析出的原始文本 |
 | `cleaned_text` | `Text` / MySQL `LONGTEXT` | 否 | `NULL` | 清洗后的文本 |
+| `refined_text` | `Text` / MySQL `LONGTEXT` | 否 | `NULL` | LLM 精修后的用户展示文本 |
 | `raw_length` | `Integer` | 是 | `0` | 原始文本长度 |
 | `cleaned_length` | `Integer` | 是 | `0` | 清洗后文本长度 |
+| `refined_length` | `Integer` | 是 | `0` | 精修后文本长度 |
 | `parser_type` | `String(64)` | 否 | `NULL` | 解析器类型，如 `pdf`、`html`、`ocr` |
 | `created_at` | `DateTime` | 是 | `func.now()` | 创建时间 |
 | `updated_at` | `DateTime` | 是 | `func.now()` | 更新时间 |
@@ -240,7 +242,7 @@
 
 ```text
 articles
-  ├── article_texts          一对一，保存原始文本和清洗文本
+  ├── article_texts          一对一，保存原始、清洗和精修文本
   ├── analysis_results       一对多，保存当前有效多品种分析结果
   ├── task_logs              一对多，保存流水线执行日志
   └── manual_confirmations   一对多，保存人工确认审计记录
@@ -274,7 +276,7 @@ articles
 
 ### 5.3 文本表与文章表分离
 
-`raw_text` 和 `cleaned_text` 可能很长，单独放在 `article_texts` 中。MySQL 使用 `LONGTEXT`，其他数据库回退到 SQLAlchemy `Text`。
+`raw_text`、`cleaned_text` 和 `refined_text` 可能很长，单独放在 `article_texts` 中。MySQL 使用 `LONGTEXT`，其他数据库回退到 SQLAlchemy `Text`。
 
 理由：
 

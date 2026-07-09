@@ -18,7 +18,7 @@ import articleDetailMock from '../mock/article_detail.json'
 const USE_MOCK = false
 
 // 真实后端基础地址
-const API_BASE = 'http://192.168.111.13:8000'
+const API_BASE = 'http://localhost:8000'
 
 async function fetchMock<T>(mockData: ApiResponse<T>): Promise<ApiResponse<T>> {
   // 模拟网络延迟

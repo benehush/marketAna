@@ -118,7 +118,7 @@ class Article(Base):
 
 
 class ArticleText(Base):
-    """文章文本内容表 - 保存文件的原始文本和清洗后的文本。"""
+    """文章文本内容表 - 保存文件的原始、清洗和精修文本。"""
     __tablename__ = "article_texts"
     __table_args__ = (
         # 一篇文章只能对应一条文本记录
@@ -133,8 +133,10 @@ class ArticleText(Base):
     )
     raw_text: Mapped[str | None] = mapped_column(TEXT_BODY, nullable=True)      # 原始提取文本
     cleaned_text: Mapped[str | None] = mapped_column(TEXT_BODY, nullable=True)  # 清洗后的文本
+    refined_text: Mapped[str | None] = mapped_column(TEXT_BODY, nullable=True)  # LLM 精修后的展示文本
     raw_length: Mapped[int] = mapped_column(Integer, nullable=False, default=0)    # 原始文本长度
     cleaned_length: Mapped[int] = mapped_column(Integer, nullable=False, default=0) # 清洗后文本长度
+    refined_length: Mapped[int] = mapped_column(Integer, nullable=False, default=0) # 精修后文本长度
     parser_type: Mapped[str | None] = mapped_column(String(64), nullable=True)  # 使用的解析器类型
     created_at: Mapped[datetime] = mapped_column(
         DateTime,

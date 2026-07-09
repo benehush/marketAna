@@ -73,7 +73,7 @@ uv run uvicorn back_end.app.main:app --reload --host 0.0.0.0
 - 创建数据库连接池
 - 启动后台 Scheduler 定时调度器
 - Scheduler **每 5 分钟**自动扫描待处理文章（`status=0`）
-- 扫描到的文章自动执行完整流水线：**解析 → 清洗 → 规则引擎分析 → LLM 分析**
+- 扫描到的文章自动执行完整流水线：**解析 → 清洗 → LLM 文本精修 → 规则引擎分析 → LLM 分析**
 
 每个阶段的具体含义：
 
@@ -81,6 +81,7 @@ uv run uvicorn back_end.app.main:app --reload --host 0.0.0.0
 |------|------|------|------|
 | **parser** | 从源文件（PDF/HTML/图片）提取原始文本 | 文件 URL | `raw_text` 写入数据库 |
 | **cleaner** | 清洗原始文本（去噪、规范化） | `raw_text` | `cleaned_text` 写入数据库 |
+| **refiner** | 将清洗文本润色成通俗自然的展示文本 | `cleaned_text` | `refined_text` 写入数据库（失败不中断） |
 | **rule_engine** | 基于规则的市场方向判断 | `cleaned_text` | 分析结果（方向+置信度） |
 | **llm_infer** | LLM 深度分析（低置信度时触发） | `cleaned_text` | 分析结果（方向+理由） |
 

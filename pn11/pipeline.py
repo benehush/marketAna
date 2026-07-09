@@ -2,7 +2,7 @@
 pn11 流水线核心编排
 
 run_pipeline(article_id, session) 是 pn03 Scheduler 的 pipeline_callback。
-按文章当前状态路由到对应 pn04-pn07 阶段，任一阶段失败即停止。
+按文章当前状态路由到对应 pn04-pn07 阶段，阻塞阶段失败即停止。
 """
 
 from __future__ import annotations
@@ -34,9 +34,9 @@ def run_pipeline(article_id: int, session: Any) -> bool:
     流水线主入口，作为 pn03 Scheduler 的 pipeline_callback。
 
     按 article.status 决定从哪个阶段开始：
-      status=0  → 从头: parser→cleaner→rule_engine→(llm_infer)
-      status=1  → 续跑: cleaner→rule_engine→(llm_infer)
-      status=2  → 续跑: rule_engine→(llm_infer)
+      status=0  → 从头: parser→cleaner→refiner→rule_engine→(llm_infer)
+      status=1  → 续跑: cleaner→refiner→rule_engine→(llm_infer)
+      status=2  → 续跑: refiner→rule_engine→(llm_infer)
       status=3  → 续跑: llm_infer
       status=5  → 已完成，跳过
       status=-1 → 根据 error_msg 判断从哪个阶段重试
@@ -102,6 +102,10 @@ def run_pipeline(article_id: int, session: Any) -> bool:
                 repo.update_status(article_id, ArticleProcessingStatus.PARSED)
                 session.refresh(article)
                 current_status = 1
+            elif retry_from == "refiner":
+                repo.update_status(article_id, ArticleProcessingStatus.CLEANED)
+                session.refresh(article)
+                current_status = 2
             elif retry_from == "rule_engine":
                 repo.update_status(article_id, ArticleProcessingStatus.CLEANED)
                 session.refresh(article)
@@ -122,8 +126,10 @@ def run_pipeline(article_id: int, session: Any) -> bool:
             _run_cleaner(article_id, session, result)
             session.refresh(article)
 
-        # status=2: CLEANED → rule_engine
+        # status=2: CLEANED → refiner(best-effort) → rule_engine
         if article.status == ArticleProcessingStatus.CLEANED:
+            _run_refiner(article_id, session, result)
+            session.refresh(article)
             need_llm = _run_rule_engine(article_id, session, result)
             session.refresh(article)
             if not need_llm:
@@ -186,6 +192,14 @@ def _run_cleaner(article_id: int, session: Any, result: PipelineResult) -> None:
     clean_article(article_id, session)
 
 
+def _run_refiner(article_id: int, session: Any, result: PipelineResult) -> None:
+    """执行 refiner 阶段；该阶段失败不阻塞后续分析。"""
+    from pn05.refiner import refine_article
+
+    result.stages_run.append("refiner")
+    refine_article(article_id, session)
+
+
 def _run_rule_engine(article_id: int, session: Any, result: PipelineResult) -> bool:
     """
     执行 rule_engine 阶段。
@@ -212,7 +226,7 @@ def _resolve_retry_stage(error_msg: str) -> str | None:
     """根据 error_msg 判断失败阶段，返回应从哪个阶段重试。"""
     msg_lower = error_msg.lower()
     # 按顺序检查：越早的阶段越优先
-    for stage in ["parser", "cleaner", "rule_engine", "llm_infer"]:
+    for stage in ["parser", "cleaner", "refiner", "rule_engine", "llm_infer"]:
         if stage in msg_lower:
             return stage
     # 无法判断 → 从头开始

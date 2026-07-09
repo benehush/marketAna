@@ -30,6 +30,8 @@ const activeResult = computed(() => {
   return allResults.value.find((r) => r.product === activeProduct.value) ?? allResults.value[0] ?? null
 })
 
+const displayText = computed(() => detail.value?.text?.refined_text || detail.value?.text?.cleaned_text || '')
+
 // 其他品种（本研报还覆盖）
 const otherResults = computed(() =>
   allResults.value.filter((r) => r.product !== activeResult.value?.product)
@@ -185,13 +187,13 @@ onMounted(fetchData)
       </div>
 
       <!-- 完整研报文本（折叠） -->
-      <div v-if="detail.text?.cleaned_text || detail.text?.raw_text" class="raw-section">
+      <div v-if="displayText || detail.text?.raw_text" class="raw-section">
         <button class="raw-toggle" @click="showRawText = !showRawText">
           {{ showRawText ? '收起完整研报文本' : '查看完整研报文本' }}
           <span class="toggle-arrow">{{ showRawText ? '▲' : '▼' }}</span>
         </button>
         <div v-if="showRawText" class="raw-content">
-          <p v-if="detail.text?.cleaned_text" class="clean-text">{{ detail.text.cleaned_text }}</p>
+          <p v-if="displayText" class="clean-text">{{ displayText }}</p>
           <pre v-if="detail.text?.raw_text" class="raw-text">{{ detail.text.raw_text }}</pre>
         </div>
       </div>
