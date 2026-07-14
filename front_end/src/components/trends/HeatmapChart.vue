@@ -118,16 +118,17 @@ function buildOption() {
       min: -1,
       max: 1,
       calculable: true,
+      precision: 2,
       orient: 'horizontal',
       left: 'center',
       bottom: 0,
-      itemWidth: 12,
-      itemHeight: 140,
+      itemWidth: 14,
+      itemHeight: 150,
       inRange: {
         color: ['#1a6b3c', '#27ae60', '#e8f5e9', '#fafafa', '#fce8e6', '#e74c3c', '#b03a2e'],
       },
-      text: ['看涨 ↑', '看跌 ↓'],
-      textStyle: { color: '#666', fontSize: 12, fontWeight: 600 },
+      text: ['看跌 ↓', '看涨 ↑'],
+      textStyle: { color: '#666', fontSize: 13, fontWeight: 600 },
     },
     series: [
       {
