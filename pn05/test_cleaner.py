@@ -19,6 +19,7 @@ from back_end.app.models.article import ArticleText, TaskLog
 from back_end.app.repositories.articles import ArticleRepository
 
 from pn05.cleaner import clean_article, CleanConfig
+from pn05.display_cleaner import clean_display_text
 from pn05.models import CleanResult
 from pn05.normalizer import (
     normalize_whitespace,
@@ -27,7 +28,7 @@ from pn05.normalizer import (
     detect_and_clean_encoding,
 )
 from pn05.noise_rules import filter_noise_lines, filter_noise_regex
-from pn05.refiner import refine_article
+from pn05.refiner import _normalize_refine_source, _split_refine_chunks, _validate_refined_text, refine_article
 from pn05.structured_cleaner import clean_text
 from pn07.models import LLMConfig
 
@@ -67,6 +68,34 @@ def _create_article_with_raw(session: Session, raw_text: str) -> int:
     repo.save_raw_text(article.id, raw_text, parser_type="html")
     session.commit()
     return article.id
+
+
+def _save_product_segment(
+    session: Session,
+    article_id: int,
+    text: str,
+    *,
+    product: str = "螺纹钢",
+    product_key: str = "SHFE.RB",
+    refined_text: str | None = None,
+) -> None:
+    repo = ArticleRepository(session)
+    repo.save_product_segments(
+        article_id,
+        [
+            {
+                "product": product,
+                "product_key": product_key,
+                "section_type": "core",
+                "heading": product,
+                "cleaned_text": text,
+                "refined_text": refined_text,
+                "start_char": 0,
+                "end_char": len(text),
+                "confidence": 0.9,
+            }
+        ],
+    )
 
 
 # ---- normalize_whitespace ----
@@ -172,6 +201,29 @@ def test_filter_noise_website_chrome():
     assert "上一篇" not in joined
 
 
+def test_clean_display_text_removes_donghai_embedded_contact_noise():
+    text = (
+        "【股指】受光伏设备、化工及电池等板块拖累，国内股市小幅下跌。"
+        "基本投资咨询证号：Z0019876\n"
+        "邮箱：liub@qh168.com.cn 有所加快；尽管国内经济趋稳且政策支持力度加大，"
+        "但外部冲击不确定性增加，导致市场风险偏好整体降温。操作方面，短期建议谨慎观望。\n"
+        "从业资格证号：F03089928\n"
+        "投资咨询证号：Z0019740\n"
+        "电话：021-68757827"
+    )
+
+    cleaned = clean_display_text(text)
+
+    assert "国内股市小幅下跌" in cleaned
+    assert "外部冲击不确定性增加" in cleaned
+    assert "谨慎观望" in cleaned
+    assert "Z0019876" not in cleaned
+    assert "liub@qh168.com.cn" not in cleaned
+    assert "F03089928" not in cleaned
+    assert "021-68757827" not in cleaned
+    assert "\n\n" not in cleaned
+
+
 # ---- filter_noise_regex ----
 
 def test_filter_disclaimer_paragraph():
@@ -272,6 +324,20 @@ def test_structured_cleaner_outputs_markdown_sections():
     assert "5,000 5,000" not in cleaned
     assert "12505-C-7900" not in cleaned
     assert stats.numeric_blocks_removed >= 3
+
+
+def test_structured_cleaner_reports_progress_steps():
+    raw = (
+        "# 镍日报\n"
+        "解析器: html\n\n"
+        "## 正文文本\n"
+        "镍价短期承压，但成本线提供支撑，关注二季度需求恢复。\n"
+    )
+    steps: list[str] = []
+
+    clean_text(raw, CleanConfig(), progress_callback=steps.append)
+
+    assert steps == ["基础规范化", "结构解析", "结构化去噪", "格式整理"]
 
 
 def test_structured_cleaner_keeps_semantic_numbers():
@@ -536,10 +602,11 @@ def test_clean_task_log(session_factory):
     session2.close()
 
 
-def test_refiner_writes_refined_text_and_preserves_cleaned_text(session_factory, monkeypatch):
+def test_refiner_writes_segment_refined_text_and_preserves_cleaned_text(session_factory, monkeypatch):
     session = session_factory()
     aid = _create_article_with_raw(session, "螺纹钢价格上涨。")
     cleaned = clean_article(aid, session)
+    _save_product_segment(session, aid, "螺纹钢价格上涨。")
     session.commit()
 
     class FakeClient:
@@ -568,8 +635,11 @@ def test_refiner_writes_refined_text_and_preserves_cleaned_text(session_factory,
     article = ArticleRepository(session).get_article_detail(aid)
     assert refined == "螺纹钢价格上涨，市场整体表现偏强。"
     assert article.text.cleaned_text == cleaned
-    assert article.text.refined_text == refined
-    assert article.text.refined_length == len(refined)
+    assert article.text.refined_text is None
+    assert article.text.refined_length == 0
+    segment = ArticleRepository(session).get_product_segments(aid)[0]
+    assert segment.refined_text == refined
+    assert segment.refined_length == len(refined)
     assert article.status == ArticleProcessingStatus.CLEANED.value
     assert session.scalars(select(TaskLog).where(
         TaskLog.article_id == aid,
@@ -579,12 +649,142 @@ def test_refiner_writes_refined_text_and_preserves_cleaned_text(session_factory,
     session.close()
 
 
+def test_refiner_joins_pdf_soft_wraps_before_chunking():
+    source = (
+        "基本面看主力合约收盘价7313 元/吨，下跌26 元/吨，现货7390 元/吨，"
+        "无变动0 元/吨，基差77 元/\n"
+        "吨，生产企业库存环\n"
+        "比去库5.9 万吨，贸易商库存14.71 万吨。"
+    )
+
+    normalized = _normalize_refine_source(source)
+    chunks = _split_refine_chunks(source, max_chars=80)
+
+    assert "基差77 元/吨，生产企业库存环比去库5.9 万吨" in normalized
+    assert all(not chunk.startswith(("吨，", "比去库")) for chunk in chunks)
+    assert "".join(chunks).replace("\n", "") == normalized.replace("\n", "")
+
+
+def test_refiner_rejects_missing_key_numbers():
+    source = "PTA 负荷79.9%，韩国 PX 出口中国16.3 万吨，库存468 万吨。"
+    refined = "PTA 负荷回升，韩国 PX 出口增加，库存改善。"
+
+    assert "关键数值缺失" in _validate_refined_text(refined, source)
+
+
+def test_refiner_only_refines_recognized_product_segments(session_factory, monkeypatch):
+    session = session_factory()
+    aid = _create_article_with_raw(session, "占位原文")
+    repo = ArticleRepository(session)
+    cleaned = (
+        "## 核心正文\n\n"
+        "【PTA】PTA 负荷回升，短期跟随原油波动。\n\n"
+        "【欧集线】运价预期偏强，供给扰动增加。\n\n"
+        "【PP】新增产能较多，价格预计维持震荡。"
+    )
+    repo.save_cleaned_text(aid, cleaned)
+    repo.save_product_segments(
+        aid,
+        [
+            {
+                "product": "PTA", "product_key": "TA", "section_type": "core",
+                "heading": "PTA", "cleaned_text": "【PTA】PTA 负荷回升，短期跟随原油波动。",
+                "start_char": 8, "end_char": 29, "confidence": 0.9,
+            },
+            {
+                "product": "未知", "product_key": "", "section_type": "core",
+                "heading": "欧集线", "cleaned_text": "【欧集线】运价预期偏强，供给扰动增加。",
+                "start_char": 31, "end_char": 50, "confidence": 0.1,
+            },
+            {
+                "product": "PP", "product_key": "PP", "section_type": "core",
+                "heading": "PP", "cleaned_text": "【PP】新增产能较多，价格预计维持震荡。",
+                "start_char": 52, "end_char": 72, "confidence": 0.9,
+            },
+        ],
+    )
+    session.commit()
+
+    class EchoClient:
+        def __init__(self, config):
+            self.calls = 0
+
+        def chat(self, messages, *, retries=None):
+            self.calls += 1
+            return messages[1]["content"].split("\n\n", 1)[1].rsplit("\n\n/no_think", 1)[0]
+
+    client = EchoClient(None)
+    monkeypatch.setattr("pn07.llm_client.LLMAPIClient", lambda config: client)
+
+    refined = refine_article(
+        aid,
+        session,
+        config=LLMConfig(provider="openai", api_key="test-key", base_url="https://example.test", max_retries=0),
+    )
+
+    assert refined is not None
+    assert "PTA 负荷回升" in refined
+    assert "欧集线】运价预期偏强" not in refined
+    assert "新增产能较多" in refined
+    segments = ArticleRepository(session).get_product_segments(aid)
+    assert [segment.refined_text is not None for segment in segments] == [True, False, True]
+    assert client.calls == 2
+    session.close()
+
+
+def test_refiner_sanitizes_llm_output_noise_and_blank_lines(session_factory, monkeypatch):
+    session = session_factory()
+    aid = _create_article_with_raw(session, "股指受外部冲击影响，市场风险偏好降温，短期建议谨慎观望。")
+    clean_article(aid, session)
+    _save_product_segment(session, aid, "股指受外部冲击影响，市场风险偏好降温，短期建议谨慎观望。", product="股指", product_key="CFFEX.IF")
+    session.commit()
+
+    class NoisyClient:
+        def __init__(self, config):
+            self.config = config
+
+        def chat(self, messages, *, retries=None):
+            return (
+                "【股指】国内股市小幅下跌。\n\n"
+                "投资咨询证号：Z0019876\n"
+                "邮箱：liub@qh168.com.cn 外部冲击不确定性增加，短期建议谨慎观望。\n"
+                "电话：021-68757827"
+            )
+
+    monkeypatch.setattr("pn07.llm_client.LLMAPIClient", NoisyClient)
+
+    refined = refine_article(
+        aid,
+        session,
+        config=LLMConfig(
+            provider="openai",
+            api_key="test-key",
+            base_url="https://example.test",
+            model="fake-refiner",
+            max_retries=0,
+        ),
+    )
+    session.commit()
+
+    assert refined is not None
+    assert "国内股市小幅下跌" in refined
+    assert "外部冲击不确定性增加" in refined
+    assert "Z0019876" not in refined
+    assert "liub@qh168.com.cn" not in refined
+    assert "021-68757827" not in refined
+    assert "\n\n" not in refined
+    segment = ArticleRepository(session).get_product_segments(aid)[0]
+    assert segment.refined_text == refined
+    session.close()
+
+
 def test_refiner_failure_is_non_blocking_and_does_not_overwrite(session_factory, monkeypatch):
     session = session_factory()
     aid = _create_article_with_raw(session, "豆粕库存下降，价格震荡偏强。")
     clean_article(aid, session)
     repo = ArticleRepository(session)
     repo.save_refined_text(aid, "已有精修文本")
+    _save_product_segment(session, aid, "豆粕库存下降，价格震荡偏强。", product="豆粕", product_key="DCE.M", refined_text="已有分段精修文本")
     session.commit()
 
     class FailingClient:
@@ -613,6 +813,7 @@ def test_refiner_failure_is_non_blocking_and_does_not_overwrite(session_factory,
     assert refined is None
     assert article.status == ArticleProcessingStatus.CLEANED.value
     assert article.text.refined_text == "已有精修文本"
+    assert ArticleRepository(session).get_product_segments(aid)[0].refined_text == "已有分段精修文本"
     assert session.scalars(select(TaskLog).where(
         TaskLog.article_id == aid,
         TaskLog.stage == "refiner",
@@ -627,6 +828,7 @@ def test_refiner_rejects_explanatory_or_corrective_output(session_factory, monke
     clean_article(aid, session)
     repo = ArticleRepository(session)
     repo.save_refined_text(aid, "已有精修文本")
+    _save_product_segment(session, aid, "工业硅现货端报价11050元/吨，价格震荡偏弱。", product="工业硅", product_key="GFEX.SI", refined_text="已有分段精修文本")
     session.commit()
 
     class CorrectingClient:
@@ -655,6 +857,7 @@ def test_refiner_rejects_explanatory_or_corrective_output(session_factory, monke
     assert refined is None
     assert article.status == ArticleProcessingStatus.CLEANED.value
     assert article.text.refined_text == "已有精修文本"
+    assert ArticleRepository(session).get_product_segments(aid)[0].refined_text == "已有分段精修文本"
     failed_log = session.scalars(select(TaskLog).where(
         TaskLog.article_id == aid,
         TaskLog.stage == "refiner",
@@ -671,6 +874,7 @@ def test_refiner_rejects_overexpanded_output(session_factory, monkeypatch):
     clean_article(aid, session)
     repo = ArticleRepository(session)
     repo.save_refined_text(aid, "已有精修文本")
+    _save_product_segment(session, aid, "豆粕库存下降，价格震荡偏强。", product="豆粕", product_key="DCE.M", refined_text="已有分段精修文本")
     session.commit()
 
     class ExpandingClient:
@@ -699,6 +903,7 @@ def test_refiner_rejects_overexpanded_output(session_factory, monkeypatch):
     assert refined is None
     assert article.status == ArticleProcessingStatus.CLEANED.value
     assert article.text.refined_text == "已有精修文本"
+    assert ArticleRepository(session).get_product_segments(aid)[0].refined_text == "已有分段精修文本"
     failed_log = session.scalars(select(TaskLog).where(
         TaskLog.article_id == aid,
         TaskLog.stage == "refiner",

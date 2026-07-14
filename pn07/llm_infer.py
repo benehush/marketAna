@@ -15,6 +15,7 @@ from back_end.app.core.status import ArticleProcessingStatus
 from pn07.json_parser import parse_llm_json
 from pn07.models import InferItem, InferResult, LLMConfig
 from pn07.prompt_builder import build_messages
+from pn06.product_catalog import product_key_for_name
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,18 @@ def infer_article(
     source = article.source or ""
     company = article.company or ""
     pub_time = str(article.publish_time) if article.publish_time else ""
+    product_segments = [
+        {
+            "product": segment.product,
+            "product_key": getattr(segment, "product_key", ""),
+            "contract": segment.contract,
+            "section_type": segment.section_type,
+            "heading": segment.heading,
+            "text": segment.cleaned_text,
+        }
+        for segment in (getattr(article, "product_segments", []) or [])
+        if segment.product != "未知" and segment.section_type != "unknown" and (segment.cleaned_text or "").strip()
+    ]
 
     # 2. 构建 prompt
     messages = build_messages(
@@ -86,43 +99,37 @@ def infer_article(
         rule_candidates=[
             {
                 "product": result.product,
+                "product_key": getattr(result, "product_key", ""),
                 "contract": result.contract,
                 "direction": result.direction,
                 "confidence": result.confidence,
             }
             for result in article.analysis_results
         ],
+        product_segments=product_segments,
     )
 
-    # 3. 调用 LLM（含重试）
+    # 3. 调用 LLM（重试由 LLMAPIClient 统一处理）
     from pn07.llm_client import LLMAPIClient
 
     client = LLMAPIClient(config)
     raw_response = ""
-    retry_count = 0
+    retry_count = config.max_retries
     last_error = ""
 
-    for attempt in range(config.max_retries + 1):
-        try:
-            raw_response = client.chat(messages, retries=0)
-            retry_count = attempt
-            last_error = ""
-            break
-        except Exception as exc:
-            retry_count = attempt
-            last_error = str(exc)
-            if attempt < config.max_retries:
-                logger.warning("LLM 调用失败 (attempt %s/%s): %s", attempt + 1, config.max_retries, exc)
-                continue
-            # 所有重试耗尽
-            elapsed = int((time.monotonic() - start_time) * 1000)
-            _fail(repo, article_id, f"LLM 调用失败（已重试 {config.max_retries} 次）: {last_error}", duration_ms=elapsed)
-            return InferResult(
-                error_msg=last_error,
-                retry_count=retry_count,
-                model=config.model,
-                duration_ms=elapsed,
-            )
+    try:
+        raw_response = client.chat(messages, retries=config.max_retries)
+        last_error = ""
+    except Exception as exc:
+        last_error = str(exc)
+        elapsed = int((time.monotonic() - start_time) * 1000)
+        _fail(repo, article_id, f"LLM 调用失败: {last_error}", duration_ms=elapsed)
+        return InferResult(
+            error_msg=last_error,
+            retry_count=retry_count,
+            model=config.model,
+            duration_ms=elapsed,
+        )
 
     # 4. 解析 JSON
     parsed, errors = parse_llm_json(raw_response)
@@ -130,11 +137,33 @@ def infer_article(
     elapsed = int((time.monotonic() - start_time) * 1000)
 
     # 5. 判定和规范化；关键字段缺失的条目低置信入库，供人工复核
+    from back_end.app.repositories.products import ProductRepository
+
+    product_matcher = ProductRepository(session).matcher(article_id)
     infer_items: list[InferItem] = []
     save_items: list[dict] = []
     raw_items = parsed.get("results") or []
-    for item in raw_items:
-        product = item.get("product") or "未知"
+    seen_normalized: set[tuple[str, str]] = set()
+    for item in sorted(raw_items, key=lambda value: float(value.get("confidence") or 0.0), reverse=True):
+        raw_product = str(item.get("product") or "").strip()
+        definition = product_matcher.resolve_name(raw_product)
+        if definition is None and raw_product:
+            matches = product_matcher.find_matches(raw_product)
+            keys = {match.product_key for match in matches}
+            if len(keys) == 1:
+                from pn06.product_catalog import get_product
+
+                definition = get_product(next(iter(keys)))
+        product = definition.display_name if definition else "未知"
+        product_key = definition.product_key if definition else ""
+        normalized_key = (
+            product_key or product,
+            str(item.get("contract") or "").strip().casefold(),
+        )
+        if normalized_key in seen_normalized:
+            errors.append(f"归一化后重复品种/合约，已忽略: {product} {item.get('contract') or ''}")
+            continue
+        seen_normalized.add(normalized_key)
         direction = item.get("direction") or "中性"
         reason = item.get("reason", "")
         confidence = float(item.get("confidence") or 0.0)
@@ -151,6 +180,7 @@ def infer_article(
         save_items.append(
             {
                 "product": product,
+                "product_key": product_key,
                 "contract": item.get("contract"),
                 "direction": direction,
                 "reason": reason or (f"LLM 推理结果。解析问题: {'; '.join(errors)}" if errors else ""),
@@ -176,6 +206,7 @@ def infer_article(
         save_items = [
             {
                 "product": "未知",
+                "product_key": "",
                 "contract": None,
                 "direction": "中性",
                 "reason": empty_reason,

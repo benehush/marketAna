@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import re
+from typing import Callable
 
 from pn05.models import CleanConfig
 from pn05.noise_rules import filter_noise_lines, filter_noise_regex
@@ -18,6 +19,8 @@ from pn05.normalizer import (
     normalize_whitespace,
     remove_html_residue,
 )
+
+ProgressCallback = Callable[[str], None]
 
 __all__ = ["StructuredCleanStats", "clean_text"]
 
@@ -77,19 +80,34 @@ _NAVIGATION_ONLY_LINES = {
 }
 
 
-def clean_text(text: str, config: CleanConfig) -> tuple[str, StructuredCleanStats]:
+def clean_text(
+    text: str,
+    config: CleanConfig,
+    *,
+    progress_callback: ProgressCallback | None = None,
+) -> tuple[str, StructuredCleanStats]:
     """清洗 raw_text，优先按 pn04 模板输出结构化 cleaned_text。"""
     stats = StructuredCleanStats()
+    _emit_progress(progress_callback, "基础规范化")
     text = _normalize_base(text, config)
 
+    _emit_progress(progress_callback, "结构解析")
     doc = _parse_document_sections(text)
     if config.structured_output and _looks_like_pn04_document(doc):
+        _emit_progress(progress_callback, "结构化去噪")
         cleaned = _clean_structured_document(doc, config, stats)
     else:
+        _emit_progress(progress_callback, "文本去噪")
         cleaned = _clean_plain_text(text, config, stats)
 
+    _emit_progress(progress_callback, "格式整理")
     cleaned = _finalize_text(cleaned, config)
     return cleaned, stats
+
+
+def _emit_progress(progress_callback: ProgressCallback | None, message: str) -> None:
+    if progress_callback is not None:
+        progress_callback(message)
 
 
 def _normalize_base(text: str, config: CleanConfig) -> str:

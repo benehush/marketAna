@@ -33,8 +33,8 @@ function buildOption() {
     tooltip: {
       position: 'top',
       formatter: (params: any) => {
-        const product = products[params.value[0]]
-        const date = dates[params.value[1]]
+        const date = dates[params.value[0]]
+        const product = products[params.value[1]]
         const val = params.value[2]
         const direction = val > 0 ? '看涨' : val < 0 ? '看跌' : '中性'
         return `${product}<br/>${date}<br/>方向：${direction}<br/>强度：${Math.abs(val).toFixed(2)}`
@@ -84,7 +84,8 @@ function buildOption() {
       {
         type: 'heatmap',
         data: matrix.flatMap((row, i) =>
-          row.map((val, j) => [i, j, val])
+          // ECharts heatmap data uses [xAxisIndex, yAxisIndex, value].
+          row.map((val, j) => [j, i, val])
         ),
         label: {
           show: true,

@@ -10,6 +10,7 @@ from scripts.ingest_files import (
     classify_file,
     extract_metadata,
     ingest_files,
+    parse_publish_time,
 )
 
 
@@ -54,6 +55,15 @@ def test_extract_metadata_from_data_style_path(tmp_path):
     assert metadata.title == "五矿期货_328010"
     assert metadata.company == "五矿期货"
     assert metadata.publish_time == datetime(2025, 4, 15)
+
+
+def test_publish_time_is_found_when_date_directory_is_the_root(tmp_path):
+    root = tmp_path / "data" / "20250401"
+    path = root / "东海期货_323471.PDF"
+    path.parent.mkdir(parents=True)
+    path.write_text("pdf placeholder")
+
+    assert parse_publish_time(path, root) == datetime(2025, 4, 1)
 
 
 def test_ingest_files_is_idempotent_and_writes_report(tmp_path):

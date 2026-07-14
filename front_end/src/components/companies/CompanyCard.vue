@@ -21,8 +21,8 @@ function confidenceColor(confidence: number): string {
   return '#e74c3c'
 }
 
-function goToArticle(articleId: number, product: string) {
-  router.push({ path: `/articles/${articleId}`, query: { product } })
+function goToResult(resultId: number) {
+  router.push({ path: `/analysis-results/${resultId}`, query: { from: 'companies' } })
 }
 </script>
 
@@ -40,10 +40,10 @@ function goToArticle(articleId: number, product: string) {
     <Transition name="slide">
       <div v-if="expanded" class="card-body">
         <div
-          v-for="(pred, i) in company.predictions"
-          :key="i"
+          v-for="pred in company.predictions"
+          :key="pred.result_id"
           class="prediction-row"
-          @click.stop="goToArticle(pred.article_id, pred.product)"
+          @click.stop="goToResult(pred.result_id)"
         >
           <span class="pred-product">{{ pred.product }}</span>
           <div class="pred-detail">

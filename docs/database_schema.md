@@ -6,9 +6,13 @@
 
 - 用 `articles` 作为文章主表，保存外部导入文章的元信息和处理状态。
 - 用 `article_texts` 保存一篇文章的原始文本和清洗后文本。
+- 用 `article_product_segments` 保存按品种切分后的正文片段，供分析依据、LLM 精修和前端详情页展示使用。
 - 用 `analysis_results` 保存当前有效分析结果，一篇文章可包含多个品种/合约观点，供前端页面、趋势图和统计查询使用。
+- 用 `analysis_review_queue` 保存冲突、证据缺失、未知品种和解析失败等不能写入正式结果的项目。
 - 用 `task_logs` 记录解析、清洗、规则识别、LLM 推理等流水线阶段日志。
 - 用 `manual_confirmations` 保存人工修正确认记录，保留修改前后对比，满足审计需求。
+- 用 `product_resolutions` 保存文章内未知品种的归一化与人工确认记录。
+- 用 `product_aliases` 保存待审核和已批准的动态别名；只有 `approved` 别名参与全局匹配。
 
 ## 2. 枚举与状态流转
 
@@ -100,6 +104,7 @@
 关系：
 
 - 一对一：`articles -> article_texts`
+- 一对多：`articles -> article_product_segments`
 - 一对多：`articles -> analysis_results`
 - 一对多：`articles -> task_logs`
 - 一对多：`articles -> manual_confirmations`
@@ -134,7 +139,44 @@
 - `article_id -> articles.id`
 - `ondelete="CASCADE"`，删除文章时同步删除文本记录。
 
-### 3.3 `analysis_results`
+### 3.3 `article_product_segments`
+
+按品种切分后的文章正文片段表。`cleaned_text` 保存清洗后的品种正文，`refined_text` 保存该品种段单独精修后的展示正文。
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| `id` | `Integer` | 是 | 自增 | 主键 |
+| `article_id` | `ForeignKey(articles.id)` | 是 | 无 | 关联文章 |
+| `product` | `String(128)` | 是 | 无 | 品种名称；无法识别时为 `未知` |
+| `contract` | `String(64)` | 否 | `NULL` | 合约 |
+| `contract_key` | `String(64)` | 是 | `""` | 合约归一化键 |
+| `segment_index` | `Integer` | 是 | `0` | 在文章中的分段顺序 |
+| `section_type` | `String(32)` | 是 | `core` | `core`、`ocr`、`table`、`ai`、`mixed`、`unknown` |
+| `heading` | `String(255)` | 否 | `NULL` | 分段标题或来源区块标题 |
+| `cleaned_text` | `Text` / MySQL `LONGTEXT` | 否 | `NULL` | 该品种清洗正文 |
+| `refined_text` | `Text` / MySQL `LONGTEXT` | 否 | `NULL` | 该品种精修正文 |
+| `cleaned_length` | `Integer` | 是 | `0` | 清洗段长度 |
+| `refined_length` | `Integer` | 是 | `0` | 精修段长度 |
+| `start_char` | `Integer` | 否 | `NULL` | 在 `article_texts.cleaned_text` 中的起始位置 |
+| `end_char` | `Integer` | 否 | `NULL` | 在 `article_texts.cleaned_text` 中的结束位置 |
+| `confidence` | `Float` | 是 | `0` | 分段归属置信度 |
+| `created_at` | `DateTime` | 是 | `func.now()` | 创建时间 |
+| `updated_at` | `DateTime` | 是 | `func.now()` | 更新时间 |
+
+约束与索引：
+
+| 名称 | 类型 | 字段 | 说明 |
+| --- | --- | --- | --- |
+| `uq_article_product_segments_scope` | UniqueConstraint | `article_id`, `product`, `contract_key`, `section_type`, `segment_index` | 防止同一轮分段重复写入 |
+| `ix_article_product_segments_product` | Index | `article_id`, `product`, `contract_key` | 按分析结果匹配正文片段 |
+| `ix_article_product_segments_section` | Index | `article_id`, `section_type` | 按正文类型定位分段 |
+
+外键：
+
+- `article_id -> articles.id`
+- `ondelete="CASCADE"`，删除文章时同步删除品种分段。
+
+### 3.4 `analysis_results`
 
 分析结果表，保存当前有效的品种/合约、方向、理由、置信度和分析方法。
 
@@ -150,6 +192,7 @@
 | `confidence` | `Float` | 是 | 无 | 置信度，范围 `0-1` |
 | `analysis_method` | `String(32)` | 是 | 无 | `rule`、`llm`、`manual` |
 | `need_manual_review` | `Boolean` | 是 | `False` | 是否需要人工确认 |
+| `evidence_json` | `JSON` | 否 | `NULL` | canonical result 的结构化证据与字符位置 |
 | `is_primary` | `Boolean` | 是 | `False` | 是否为文章兼容主结果 |
 | `model_name` | `String(128)` | 否 | `NULL` | LLM 模型名称 |
 | `llm_duration_ms` | `Integer` | 否 | `NULL` | LLM 调用耗时 |
@@ -163,7 +206,7 @@
 
 | 名称 | 类型 | 字段 | 说明 |
 | --- | --- | --- | --- |
-| `uq_analysis_results_article_product_contract` | UniqueConstraint | `article_id`, `product`, `contract_key` | 同一文章同一品种合约只保留一条当前有效结果 |
+| `uq_analysis_results_article_product_contract` | UniqueConstraint | `article_id`, `product_key`, `contract_key` | 同一文章同一标准品种合约只保留一条当前有效结果 |
 | `ck_analysis_results_direction` | CheckConstraint | `direction` | 限制方向枚举 |
 | `ck_analysis_results_confidence` | CheckConstraint | `confidence` | 限制置信度为 `0-1` |
 | `ck_analysis_results_method` | CheckConstraint | `analysis_method` | 限制分析方法枚举 |
@@ -177,7 +220,7 @@
 - `article_id -> articles.id`
 - `ondelete="CASCADE"`，删除文章时同步删除分析结果。
 
-### 3.4 `task_logs`
+### 3.5 `task_logs`
 
 任务日志表，记录调度和流水线阶段执行情况。
 
@@ -204,7 +247,7 @@
 - `article_id -> articles.id`
 - `ondelete="CASCADE"`，删除文章时同步删除该文章日志。
 
-### 3.5 `manual_confirmations`
+### 3.6 `manual_confirmations`
 
 人工确认记录表，保存分析结果被人工修正前后的完整对比。
 
@@ -243,6 +286,7 @@
 ```text
 articles
   ├── article_texts          一对一，保存原始、清洗和精修文本
+  ├── article_product_segments 一对多，保存按品种切分后的正文片段
   ├── analysis_results       一对多，保存当前有效多品种分析结果
   ├── task_logs              一对多，保存流水线执行日志
   └── manual_confirmations   一对多，保存人工确认审计记录
@@ -254,7 +298,7 @@ articles
 
 ### 5.1 当前分析结果按品种/合约保留
 
-`analysis_results` 使用 `(article_id, product, contract_key)` 唯一约束，表示一篇文章可保留多条当前有效结果，但同一品种合约重跑时更新旧结果。
+`analysis_results` 使用 `(article_id, product_key, contract_key)` 唯一约束，表示一篇文章可保留多条当前有效结果，但同一标准品种合约重跑时更新旧结果。`product` 只是展示名称。
 
 理由：
 
@@ -297,6 +341,8 @@ articles
 - 趋势聚合：`analysis_time`
 - 详情排查：`task_logs.article_id + stage`
 - 人工确认审计：`manual_confirmations.confirmed_at`
+- 品种归一化审核：`product_resolutions.status + created_at`
+- 动态别名审核：`product_aliases.status + created_at`
 
 暂未加入全文索引、版本索引和复杂联合索引，避免第一版过度设计。
 
@@ -322,7 +368,7 @@ articles
 当前测试覆盖在 [tests/test_backend_data.py](/home/sanmu/marketANA/tests/test_backend_data.py)：
 
 - 核心表能创建成功。
-- `analysis_results` 存在 `(article_id, product, contract_key)` 唯一约束。
+- `analysis_results` 存在 `(article_id, product_key, contract_key)` 唯一约束。
 - `articles.status` 非法值会触发约束错误。
 - 状态流转、失败日志、分析结果幂等覆盖可用。
 - 统计、趋势、列表、详情、人工确认接口契约可用。

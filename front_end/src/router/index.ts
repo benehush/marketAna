@@ -24,14 +24,27 @@ const router = createRouter({
       component: () => import('../views/TrendsView.vue'),
     },
     {
+      path: '/analysis-results/:id',
+      name: 'analysis-result-detail',
+      component: () => import('../views/AnalysisResultDetailView.vue'),
+    },
+    {
       path: '/articles',
-      name: 'articles',
+      redirect: '/review-queue',
+    },
+    {
+      path: '/review-queue',
+      name: 'review-queue',
       component: () => import('../views/ArticlesView.vue'),
     },
     {
       path: '/articles/:id',
       name: 'article-detail',
       component: () => import('../views/ArticleDetailView.vue'),
+    },
+    {
+      path: '/review-queue/:id',
+      redirect: (to) => ({ path: `/articles/${to.params.id}`, query: to.query }),
     },
   ],
 })

@@ -3,24 +3,29 @@
 包括：文章 CRUD、文本处理、分析结果存储、状态管理、任务日志、趋势查询等
 """
 from datetime import datetime, time
+import hashlib
 from typing import Any
 
 from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from back_end.app.core.exceptions import AppException, ErrorCode
-from back_end.app.core.display import displayable_product_clause
+from back_end.app.core.review import REVIEW_REASON_CODES
+from back_end.app.core.display import displayable_product_clause, formal_analysis_clause
 from back_end.app.core.status import ARTICLE_STATUS_VALUES, ArticleProcessingStatus
 from back_end.app.models import (
     ANALYSIS_METHOD_VALUES,
     DIRECTION_VALUES,
     AnalysisResult,
+    AnalysisReviewQueue,
     Article,
+    ArticleProductSegment,
     ArticleText,
     ManualConfirmation,
     TaskLog,
 )
 from back_end.app.repositories.base import BaseRepository
+from data_proccessing.catalog import product_key_for_name
 
 
 class ArticleRepository(BaseRepository):
@@ -76,8 +81,10 @@ class ArticleRepository(BaseRepository):
             .options(
                 selectinload(Article.text),
                 selectinload(Article.analysis_results),
+                selectinload(Article.product_segments),
                 selectinload(Article.task_logs),
                 selectinload(Article.manual_confirmations),
+                selectinload(Article.review_queue),
             )
             .where(Article.id == article_id)
         )
@@ -168,11 +175,118 @@ class ArticleRepository(BaseRepository):
         self.session.flush()
         return article_text
 
+    def save_product_segments(
+        self,
+        article_id: int,
+        segments: list[dict[str, Any]],
+    ) -> list[ArticleProductSegment]:
+        """保存按品种切分的正文片段；每次重跑替换该文章旧分段。"""
+        article = self.require_article(article_id)
+        existing = list(
+            self.session.scalars(
+                select(ArticleProductSegment).where(ArticleProductSegment.article_id == article_id)
+            ).all()
+        )
+        for segment in existing:
+            self.session.delete(segment)
+        self.session.flush()
+
+        saved: list[ArticleProductSegment] = []
+        for index, item in enumerate(segments):
+            product = str(item.get("product") or "未知").strip() or "未知"
+            contract = item.get("contract")
+            contract = str(contract).strip() if contract is not None and str(contract).strip() else None
+            cleaned_text = str(item.get("cleaned_text") or "").strip()
+            refined_text_value = item.get("refined_text")
+            refined_text = (
+                str(refined_text_value).strip()
+                if refined_text_value is not None and str(refined_text_value).strip()
+                else None
+            )
+            segment = ArticleProductSegment(
+                article_id=article_id,
+                product=product,
+                product_key=str(item.get("product_key") or product_key_for_name(product) or _legacy_product_key(product)),
+                raw_product_name=(
+                    str(item.get("raw_product_name")).strip()
+                    if item.get("raw_product_name") else None
+                ),
+                resolution_method=str(item.get("resolution_method") or "unknown"),
+                resolution_confidence=float(item.get("resolution_confidence") or item.get("confidence") or 0.0),
+                contract=contract,
+                contract_key=self._normalize_contract_key(contract),
+                segment_index=int(item.get("segment_index", index) or 0),
+                section_type=str(item.get("section_type") or "core").strip() or "core",
+                heading=(str(item.get("heading")).strip() if item.get("heading") else None),
+                cleaned_text=cleaned_text,
+                refined_text=refined_text,
+                cleaned_length=len(cleaned_text),
+                refined_length=len(refined_text or ""),
+                start_char=item.get("start_char"),
+                end_char=item.get("end_char"),
+                confidence=float(item.get("confidence") or 0.0),
+            )
+            self.session.add(segment)
+            saved.append(segment)
+
+        self.session.flush()
+        self.session.expire(article, ["product_segments"])
+        return saved
+
+    def get_product_segments(self, article_id: int) -> list[ArticleProductSegment]:
+        """读取一篇文章的品种分段，按原文顺序排序。"""
+        return list(
+            self.session.scalars(
+                select(ArticleProductSegment)
+                .where(ArticleProductSegment.article_id == article_id)
+                .order_by(
+                    ArticleProductSegment.segment_index.asc(),
+                    ArticleProductSegment.id.asc(),
+                )
+            ).all()
+        )
+
+    def find_product_segment(
+        self,
+        article_id: int,
+        product: str,
+        contract_key: str | None = None,
+    ) -> ArticleProductSegment | None:
+        """查找最适合某个分析结果的品种正文片段。"""
+        product = (product or "").strip()
+        if not product:
+            return None
+        segments = self.get_product_segments(article_id)
+        displayable = [
+            segment
+            for segment in segments
+            if segment.product == product and segment.section_type != "unknown"
+        ]
+        normalized_contract = self._normalize_contract_key(contract_key)
+        if normalized_contract:
+            exact = [segment for segment in displayable if segment.contract_key == normalized_contract]
+            if exact:
+                displayable = exact
+        if not displayable:
+            return None
+
+        section_priority = {"core": 0, "ocr": 1, "ai": 2, "table": 3, "mixed": 4}
+        return sorted(
+            displayable,
+            key=lambda item: (
+                section_priority.get(item.section_type, 9),
+                -float(item.confidence or 0.0),
+                item.segment_index,
+                item.id or 0,
+            ),
+        )[0]
+
     def save_analysis_result(
         self,
         article_id: int,
         *,
         product: str,
+        product_key: str | None = None,
         direction: str,
         reason: str | None,
         confidence: float,
@@ -193,6 +307,7 @@ class ArticleRepository(BaseRepository):
             [
                 {
                     "product": product,
+                    "product_key": product_key or product_key_for_name(product) or _legacy_product_key(product),
                     "contract": contract,
                     "direction": direction,
                     "reason": reason,
@@ -220,7 +335,7 @@ class ArticleRepository(BaseRepository):
     ) -> list[AnalysisResult]:
         """批量保存一篇文章的多品种分析结果。
 
-        按 (article_id, product, contract_key) 幂等更新；不删除未出现在本批次
+        按 (article_id, product_key, contract_key) 幂等更新；不删除未出现在本批次
         的既有结果，便于规则高置信结果和 LLM 补全结果分阶段合并。
         """
         self.require_article(article_id)
@@ -248,8 +363,9 @@ class ArticleRepository(BaseRepository):
                 {
                     **item,
                     "product": product,
+                    "product_key": str(item.get("product_key") or product_key_for_name(product) or _legacy_product_key(product)),
                     "contract": contract,
-                    "contract_key": self._normalize_contract_key(contract),
+                    "contract_key": self._normalize_contract_key(item.get("contract_key") or contract),
                     "direction": direction,
                     "confidence": confidence,
                     "analysis_method": analysis_method,
@@ -265,23 +381,36 @@ class ArticleRepository(BaseRepository):
             existing_results = list(self.session.scalars(
                 select(AnalysisResult).where(AnalysisResult.article_id == article_id)
             ).all())
-            for existing in existing_results:
-                existing.is_primary = False
+            manual_primary = any(
+                existing.analysis_method == "manual" and existing.is_primary
+                for existing in existing_results
+            )
+            incoming_manual = any(item["analysis_method"] == "manual" for item in normalized)
+            if manual_primary and not incoming_manual:
+                for item in normalized:
+                    item["is_primary"] = False
+            else:
+                for existing in existing_results:
+                    existing.is_primary = False
 
         saved: list[AnalysisResult] = []
         for item in normalized:
             result = self.session.scalar(
                 select(AnalysisResult).where(
                     AnalysisResult.article_id == article_id,
-                    AnalysisResult.product == item["product"],
+                    AnalysisResult.product_key == item["product_key"],
                     AnalysisResult.contract_key == item["contract_key"],
                 )
             )
             if result is None:
                 result = AnalysisResult(article_id=article_id)
                 self.session.add(result)
+            elif result.analysis_method == "manual" and item["analysis_method"] != "manual":
+                saved.append(result)
+                continue
 
             result.product = item["product"]
+            result.product_key = item["product_key"]
             result.contract = item["contract"]
             result.contract_key = item["contract_key"]
             result.direction = item["direction"]
@@ -289,6 +418,7 @@ class ArticleRepository(BaseRepository):
             result.confidence = item["confidence"]
             result.analysis_method = item["analysis_method"]
             result.need_manual_review = bool(item.get("need_manual_review", False))
+            result.evidence_json = item.get("evidence")
             result.is_primary = bool(item.get("is_primary", False))
             result.model_name = item.get("model_name")
             result.llm_duration_ms = item.get("llm_duration_ms")
@@ -405,6 +535,7 @@ class ArticleRepository(BaseRepository):
         self,
         *,
         product: str | None = None,
+        product_key: str | None = None,
         company: str | None = None,
         direction: str | None = None,
         status: int | None = None,
@@ -432,6 +563,7 @@ class ArticleRepository(BaseRepository):
         """
         stmt = self._article_filter_stmt(
             product=product,
+            product_key=product_key,
             company=company,
             direction=direction,
             status=status,
@@ -505,7 +637,7 @@ class ArticleRepository(BaseRepository):
         # 文章总数
         total_count = int(self.session.scalar(select(func.count(Article.id))) or 0)
         # 待人工复核数
-        manual_review_count = int(
+        result_review_count = int(
             self.session.scalar(
                 select(func.count(AnalysisResult.id))
                 .join(Article, Article.id == AnalysisResult.article_id)
@@ -517,13 +649,25 @@ class ArticleRepository(BaseRepository):
             )
             or 0
         )
+        queue_review_count = int(
+            self.session.scalar(
+                select(func.count(AnalysisReviewQueue.id))
+                .join(Article, Article.id == AnalysisReviewQueue.article_id)
+                .where(
+                    Article.status == ArticleProcessingStatus.STORED.value,
+                    AnalysisReviewQueue.status == "pending",
+                )
+            )
+            or 0
+        )
+        manual_review_count = result_review_count + queue_review_count
         # 方向分布统计
         direction_rows = self.session.execute(
             select(AnalysisResult.direction, func.count(AnalysisResult.id))
             .join(Article, Article.id == AnalysisResult.article_id)
             .where(
                 Article.status == ArticleProcessingStatus.STORED.value,
-                displayable_product_clause(AnalysisResult.product),
+                formal_analysis_clause(AnalysisResult),
             )
             .group_by(AnalysisResult.direction)
         ).all()
@@ -569,7 +713,7 @@ class ArticleRepository(BaseRepository):
             .join(Article, Article.id == AnalysisResult.article_id)
             .where(
                 Article.status == ArticleProcessingStatus.STORED.value,
-                displayable_product_clause(AnalysisResult.product),
+                formal_analysis_clause(AnalysisResult),
             )
             .group_by("date", AnalysisResult.product, AnalysisResult.direction)
             .order_by("date", AnalysisResult.product)
@@ -596,6 +740,7 @@ class ArticleRepository(BaseRepository):
         result_id: int,
         *,
         product: str,
+        product_key: str | None = None,
         direction: str,
         reason: str | None,
         confidence: float,
@@ -636,10 +781,12 @@ class ArticleRepository(BaseRepository):
         confirmation = ManualConfirmation(
             article_id=result.article_id,
             original_product=result.product,
+            original_product_key=result.product_key,
             original_direction=result.direction,
             original_reason=result.reason,
             original_confidence=result.confidence,
             confirmed_product=product,
+            confirmed_product_key=product_key or product_key_for_name(product) or None,
             confirmed_direction=direction,
             confirmed_reason=reason,
             confirmed_confidence=confidence,
@@ -650,6 +797,7 @@ class ArticleRepository(BaseRepository):
 
         # 用修正数据覆盖原分析结果
         result.product = product
+        result.product_key = product_key or product_key_for_name(product) or _legacy_product_key(product)
         result.contract_key = self._normalize_contract_key(result.contract)
         result.direction = direction
         result.reason = reason
@@ -659,6 +807,140 @@ class ArticleRepository(BaseRepository):
         self.update_status(result.article_id, ArticleProcessingStatus.STORED)
         self.session.flush()
         return confirmation
+
+    def reject_review_item(
+        self,
+        review_id: int,
+        *,
+        reviewed_by: str,
+        reason_code: str,
+        note: str | None = None,
+    ) -> AnalysisReviewQueue:
+        """Persist a false-positive decision; pipeline imports must not reopen it."""
+        reviewed_by = reviewed_by.strip()
+        if not reviewed_by or reason_code not in REVIEW_REASON_CODES:
+            raise AppException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="A reviewer and valid rejection reason are required",
+                detail={"reason_code": reason_code},
+            )
+        item = self.session.scalar(
+            select(AnalysisReviewQueue).where(AnalysisReviewQueue.id == review_id)
+        )
+        if item is None:
+            raise AppException(
+                code=ErrorCode.NOT_FOUND,
+                message="Review item not found",
+                detail={"review_id": review_id},
+                status_code=404,
+            )
+        if item.status == "resolved":
+            raise AppException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="Resolved review item cannot be rejected",
+                detail={"review_id": review_id},
+            )
+        item.status = "rejected"
+        item.reviewed_by = reviewed_by
+        item.review_reason_code = reason_code
+        item.review_note = note
+        item.reviewed_at = datetime.now()
+        self.session.flush()
+        return item
+
+    def create_manual_conclusion(
+        self,
+        review_id: int,
+        *,
+        direction: str,
+        reason: str,
+        evidence: str,
+        product_key: str,
+        reviewed_by: str,
+    ) -> AnalysisResult:
+        """Create a formal result only from a complete, pending manual decision."""
+        direction = direction.strip()
+        reason = reason.strip()
+        evidence = evidence.strip()
+        self._validate_direction(direction)
+        if not reason or not evidence:
+            raise AppException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="Direction, reason and evidence are required",
+                detail={"review_id": review_id},
+            )
+        reviewed_by = reviewed_by.strip()
+        if not reviewed_by:
+            raise AppException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="Reviewer is required",
+            )
+        item = self.session.scalar(
+            select(AnalysisReviewQueue).where(AnalysisReviewQueue.id == review_id)
+        )
+        if item is None:
+            raise AppException(
+                code=ErrorCode.NOT_FOUND,
+                message="Review item not found",
+                detail={"review_id": review_id},
+                status_code=404,
+            )
+        if item.status != "pending":
+            raise AppException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="Only pending review items can create a conclusion",
+                detail={"review_id": review_id, "status": item.status},
+            )
+        from data_proccessing.catalog import get_product
+
+        catalog_product = get_product(product_key.strip())
+        if catalog_product is None or not catalog_product.active or catalog_product.product_key.startswith("GROUP."):
+            raise AppException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="A valid active product is required for a formal conclusion",
+                detail={"review_id": review_id, "product_key": product_key},
+            )
+        confirmed_product = catalog_product.display_name
+        confirmed_key = catalog_product.product_key
+        result = self.save_analysis_result(
+            item.article_id,
+            product=confirmed_product,
+            product_key=confirmed_key or None,
+            direction=direction,
+            reason=reason,
+            confidence=1.0,
+            analysis_method="manual",
+            need_manual_review=False,
+            mark_stored=True,
+            is_primary=True,
+        )
+        result.evidence_json = {
+            "summary": reason,
+            "source": "manual",
+            "excerpts": [{"quote": evidence, "source": "manual", "start_char": None, "end_char": None, "match_type": "manual"}],
+            "notes": "人工审核人员填写的正式结论证据",
+        }
+        self.session.add(ManualConfirmation(
+            article_id=item.article_id,
+            original_product=item.product,
+            original_product_key=item.product_key,
+            original_direction=None,
+            original_reason=item.reason,
+            original_confidence=None,
+            confirmed_product=confirmed_product,
+            confirmed_product_key=result.product_key,
+            confirmed_direction=direction,
+            confirmed_reason=reason,
+            confirmed_confidence=1.0,
+            confirmed_by=reviewed_by,
+            note=f"由人工审核项 #{review_id} 创建",
+        ))
+        item.status = "resolved"
+        item.reviewed_by = reviewed_by
+        item.review_note = reason
+        item.reviewed_at = datetime.now()
+        self.session.flush()
+        return result
 
     # ==================== 私有辅助方法 ====================
 
@@ -677,6 +959,7 @@ class ArticleRepository(BaseRepository):
         self,
         *,
         product: str | None,
+        product_key: str | None,
         company: str | None,
         direction: str | None,
         status: int | None,
@@ -689,13 +972,29 @@ class ArticleRepository(BaseRepository):
         使用 relationship.any 过滤分析结果，避免一文多结果导致文章重复。
         """
         displayable_clause = displayable_product_clause(AnalysisResult.product)
-        stmt = select(Article).where(Article.analysis_results.any(displayable_clause))
+        # Article list is also the processing inbox: a successfully parsed
+        # article with no formal result must remain visible for review.
+        stmt = select(Article).where(
+            or_(
+                ~Article.analysis_results.any(),
+                Article.analysis_results.any(displayable_clause),
+            )
+        )
         if product:
             stmt = stmt.where(
                 Article.analysis_results.any(
                     and_(
                         displayable_clause,
                         AnalysisResult.product == product,
+                    )
+                )
+            )
+        if product_key:
+            stmt = stmt.where(
+                Article.analysis_results.any(
+                    and_(
+                        displayable_clause,
+                        AnalysisResult.product_key == product_key,
                     )
                 )
             )
@@ -785,3 +1084,10 @@ class ArticleRepository(BaseRepository):
         if not contract:
             return ""
         return str(contract).strip().lower().replace("合约", "").replace(" ", "")
+
+
+def _legacy_product_key(product: str) -> str:
+    """Give legacy/manual callers a stable non-empty identity."""
+    normalized = " ".join((product or "").strip().split())
+    digest = hashlib.sha1(normalized.encode("utf-8")).hexdigest()[:12]
+    return f"LEGACY.{digest}"

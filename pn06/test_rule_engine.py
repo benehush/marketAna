@@ -15,6 +15,7 @@ from sqlalchemy.pool import StaticPool
 
 from back_end.app.core.database import Base, create_database_tables
 from back_end.app.core.status import ArticleProcessingStatus
+from back_end.app.models.article import TaskLog
 from back_end.app.repositories.articles import ArticleRepository
 
 from pn06.rule_engine import analyze_article, RuleConfig
@@ -22,6 +23,7 @@ from pn06.models import RuleResult
 from pn06.product_dict import detect_products, get_primary_product
 from pn06.direction_rules import detect_direction, extract_reason
 from pn06.confidence import calculate_confidence
+from pn07.models import LLMConfig
 
 
 # ---- Fixtures ----
@@ -86,6 +88,53 @@ def test_detect_product_alias():
     prods = detect_products(text)
     assert "螺纹钢" in prods  # RB → 螺纹钢
     assert "铁矿石" in prods  # 铁矿 → 铁矿石
+
+
+def test_detect_product_excludes_us_soybean_oil_false_positive():
+    assert "豆油" not in detect_products("4 月份美豆油受政策不确定影响波动增加。")
+    assert "豆油" in detect_products("豆油库存下降，基差偏弱。")
+
+
+def test_detect_product_new_mainstream_varieties():
+    text = (
+        "【锡】矿山复工取消，锡价情绪推动上涨。"
+        "【铅】再生铅供应偏紧。"
+        "【不锈钢】库存回落。"
+        "【纸浆】进口压力仍存。"
+        "【尿素】需求进入旺季。"
+        "【碳酸锂】供给维持高位。"
+        "【工业硅】库存压力较大。"
+        "【氧化铝】成本支撑减弱。"
+        "【烧碱】现货偏强。"
+        "【苯乙烯】港口库存下降。"
+        "【液化气】跟随原油震荡。"
+    )
+    prods = detect_products(text)
+
+    assert "沪锡" in prods
+    assert "沪铅" in prods
+    assert "不锈钢" in prods
+    assert "纸浆" in prods
+    assert "尿素" in prods
+    assert "碳酸锂" in prods
+    assert "工业硅" in prods
+    assert "氧化铝" in prods
+    assert "烧碱" in prods
+    assert "苯乙烯" in prods
+    assert "液化气" in prods
+
+
+def test_detect_product_avoids_dangerous_single_character_aliases():
+    text = "有色金属整体承压，银行资金面扰动金融市场。"
+    prods = detect_products(text)
+    assert "黄金" not in prods
+    assert "白银" not in prods
+
+    assert "白银" in detect_products("白银价格震荡偏强，沪银主力走高。")
+    assert "白糖" in detect_products("白糖现货价格偏强。")
+    assert "棉花" in detect_products("棉花需求改善。")
+    assert "白糖" not in detect_products("糖厂开机率上升。")
+    assert "棉花" not in detect_products("纺织企业棉库存偏低。")
 
 
 # ---- 方向检测 ----
@@ -186,6 +235,130 @@ def test_full_pipeline_high_conf(session_factory):
     assert article.status == ArticleProcessingStatus.STORED.value
     assert article.analysis_result is not None
     assert article.analysis_result.analysis_method == "rule"
+    session2.close()
+
+
+def test_high_conf_segment_reason_is_refined_by_llm(session_factory, monkeypatch):
+    session = session_factory()
+    text = (
+        "【股指】股指看跌，市场小幅下跌，风险偏好降温，短期偏弱。"
+        "投资咨询证号：Z0019876 邮箱：liub@qh168.com.cn 操作方面，短期建议谨慎观望。"
+    )
+    aid = _create_article_with_clean(session, text)
+    repo = ArticleRepository(session)
+    repo.save_product_segments(
+        aid,
+        [
+            {
+                "product": "股指",
+                "section_type": "core",
+                "heading": "股指",
+                "cleaned_text": text,
+                "start_char": 0,
+                "end_char": len(text),
+                "confidence": 0.9,
+            }
+        ],
+    )
+    session.commit()
+    session.close()
+
+    class FakeClient:
+        def __init__(self, config):
+            self.config = config
+
+        def chat(self, messages, *, retries=None):
+            assert "结论依据" in messages[1]["content"]
+            return "光伏设备、化工及电池等板块拖累市场，外部冲击不确定性增加，短期建议谨慎观望。"
+
+    monkeypatch.setattr(
+        LLMConfig,
+        "from_settings",
+        classmethod(lambda cls: LLMConfig(
+            provider="openai",
+            api_key="test-key",
+            base_url="https://example.test",
+            model="fake-reason",
+            max_retries=0,
+        )),
+    )
+    monkeypatch.setattr("pn07.llm_client.LLMAPIClient", FakeClient)
+
+    session2 = session_factory()
+    result = analyze_article(aid, session2)
+    session2.commit()
+    session2.expire_all()
+
+    article = ArticleRepository(session2).get_article_detail(aid)
+    saved_result = article.analysis_results[0]
+    assert result.need_llm is False
+    assert saved_result.reason == "光伏设备、化工及电池等板块拖累市场，外部冲击不确定性增加，短期建议谨慎观望。"
+    assert "Z0019876" not in saved_result.reason
+    assert session2.query(TaskLog).filter_by(
+        article_id=aid,
+        stage="reason_refiner",
+        status="success",
+    ).first() is not None
+    session2.close()
+
+
+def test_high_conf_segment_reason_falls_back_to_cleaned_rule_reason(session_factory, monkeypatch):
+    session = session_factory()
+    text = (
+        "【股指】股指看跌，市场小幅下跌，风险偏好降温，短期偏弱。"
+        "投资咨询证号：Z0019876 邮箱：liub@qh168.com.cn 操作方面，短期建议谨慎观望。"
+    )
+    aid = _create_article_with_clean(session, text)
+    ArticleRepository(session).save_product_segments(
+        aid,
+        [
+            {
+                "product": "股指",
+                "section_type": "core",
+                "heading": "股指",
+                "cleaned_text": text,
+                "start_char": 0,
+                "end_char": len(text),
+                "confidence": 0.9,
+            }
+        ],
+    )
+    session.commit()
+    session.close()
+
+    class FailingClient:
+        def __init__(self, config):
+            self.config = config
+
+        def chat(self, messages, *, retries=None):
+            raise RuntimeError("reason service down")
+
+    monkeypatch.setattr(
+        LLMConfig,
+        "from_settings",
+        classmethod(lambda cls: LLMConfig(
+            provider="openai",
+            api_key="test-key",
+            base_url="https://example.test",
+            model="fake-reason",
+            max_retries=0,
+        )),
+    )
+    monkeypatch.setattr("pn07.llm_client.LLMAPIClient", FailingClient)
+
+    session2 = session_factory()
+    result = analyze_article(aid, session2)
+    session2.commit()
+    session2.expire_all()
+
+    article = ArticleRepository(session2).get_article_detail(aid)
+    saved_result = article.analysis_results[0]
+    assert result.need_llm is False
+    assert article.status == ArticleProcessingStatus.STORED.value
+    assert "市场小幅下跌" in saved_result.reason
+    assert "谨慎观望" in saved_result.reason
+    assert "Z0019876" not in saved_result.reason
+    assert "liub@qh168.com.cn" not in saved_result.reason
     session2.close()
 
 

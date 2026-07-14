@@ -391,6 +391,7 @@ def test_wenhua_sse_line_parser():
 def test_openai_compatible_base_url_accepts_v1_suffix():
     client = LLMAPIClient(
         LLMConfig(
+            provider="openai",
             api_key="sk-test",
             base_url="https://api.siliconflow.cn/v1",
             model="Pro/zai-org/GLM-4.7",
@@ -404,6 +405,7 @@ def test_openai_compatible_base_url_accepts_v1_suffix():
 def test_openai_compatible_base_url_accepts_service_root():
     client = LLMAPIClient(
         LLMConfig(
+            provider="openai",
             api_key="sk-test",
             base_url="https://api.siliconflow.cn",
             model="Pro/zai-org/GLM-4.7",

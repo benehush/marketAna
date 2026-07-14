@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Any
+from typing import Any, Callable
 
 from pn05.models import CleanConfig, CleanResult
 from pn05.structured_cleaner import clean_text
@@ -19,12 +19,15 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["clean_article", "CleanConfig"]
 
+ProgressCallback = Callable[[str], None]
+
 
 def clean_article(
     article_id: int,
     session: Any,
     *,
     config: CleanConfig | None = None,
+    progress_callback: ProgressCallback | None = None,
 ) -> str:
     """
     清洗单篇文章的 raw_text，写入 cleaned_text。
@@ -55,6 +58,8 @@ def clean_article(
     repo = ArticleRepository(session)
     start_time = time.monotonic()
 
+    _emit_progress(progress_callback, "读取原文")
+
     # 1. 读取 raw_text
     article = repo.get_article_detail(article_id)
     if article is None or article.text is None:
@@ -69,10 +74,12 @@ def clean_article(
 
     try:
         # 2-7. 编码修复、模板分区、噪声过滤、数字图表噪声压制、格式化输出
-        text, clean_stats = clean_text(raw_text, config)
+        text, clean_stats = clean_text(raw_text, config, progress_callback=progress_callback)
         result.noise_lines_removed = clean_stats.noise_lines_removed
         result.numeric_blocks_removed = clean_stats.numeric_blocks_removed
         result.low_density_removed = clean_stats.low_density_removed
+
+        _emit_progress(progress_callback, "校验结果")
 
         cleaned_length = len(text)
         result.cleaned_length = cleaned_length
@@ -94,6 +101,8 @@ def clean_article(
         # 截断保护
         if len(text) > config.max_text_length:
             text = text[: config.max_text_length] + f"\n\n[文本过长，已截断，原长度: {len(text)} 字符]"
+
+        _emit_progress(progress_callback, "写入结果")
 
         # 8. 写入数据库
         repo.save_cleaned_text(article_id=article_id, cleaned_text=text)
@@ -201,3 +210,8 @@ def _handle_failure(
     except Exception as log_exc:
         logger.error("写入失败日志时异常: %s", log_exc)
     return ValueError(message)
+
+
+def _emit_progress(progress_callback: ProgressCallback | None, message: str) -> None:
+    if progress_callback is not None:
+        progress_callback(message)

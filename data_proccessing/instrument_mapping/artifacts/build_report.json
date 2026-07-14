@@ -1,0 +1,25 @@
+{
+  "_comment": {
+    "documents": "本次构建处理的文档总数",
+    "lexicon_entries": "最终词条数（已收录的品种别名分组）",
+    "candidate_count": "所有候选别名总数",
+    "status_counts": "各状态候选别名数量分布",
+    "approved_seed_aliases": "来自种子库、直接通过的别名数（seed approved）",
+    "auto_approved_aliases": "自动阈值通过（无需人工审查）的别名数",
+    "review_required_aliases": "需要人工审查的别名数",
+    "rejected_aliases": "被拒绝的别名数",
+    "top_review_required": "需要人工审查的前 20 条候选别名详情"
+  },
+  "documents": 5101,
+  "lexicon_entries": 91,
+  "candidate_count": 6709,
+  "status_counts": {
+    "approved_seed": 248,
+    "rejected": 6461
+  },
+  "approved_seed_aliases": 248,
+  "auto_approved_aliases": 0,
+  "review_required_aliases": 0,
+  "rejected_aliases": 6461,
+  "top_review_required": []
+}

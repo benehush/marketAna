@@ -23,9 +23,9 @@ print(results.summary())  # 批量处理完成: 3篇, 成功=3, 失败=0
 ## 状态路由
 
 ```
-status=0  → parser → cleaner → refiner → rule_engine → (llm_infer) → stored
-status=1  → cleaner → refiner → rule_engine → (llm_infer) → stored
-status=2  → refiner → rule_engine → (llm_infer) → stored
+status=0  → parser → cleaner → product_segmenter → product_resolver → refiner → rule_engine → (llm_infer) → stored
+status=1  → cleaner → product_segmenter → product_resolver → refiner → rule_engine → (llm_infer) → stored
+status=2  → product_segmenter → product_resolver → refiner → rule_engine → (llm_infer) → stored
 status=3  → llm_infer → stored
 status=5  → 跳过（已完成）
 status=-1 → 根据 error_msg 判断失败阶段，重置后重试

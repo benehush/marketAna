@@ -1,8 +1,8 @@
 """
 pn07 LLM API 客户端
 
-使用 httpx 调用 OpenAI 兼容 API (/v1/chat/completions)。
-支持自动重试（指数退避）和健康检查。
+默认支持文华 GetContent SSE 接口，也保留 OpenAI 兼容 API
+(/v1/chat/completions) 路径。支持自动重试（指数退避）和健康检查。
 """
 
 from __future__ import annotations
@@ -15,14 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class LLMAPIClient:
-    """OpenAI 兼容 API 客户端。
-
-    Usage:
-        config = LLMConfig.from_settings()
-        client = LLMAPIClient(config)
-        if client.health_check():
-            response = client.chat([{"role": "user", "content": "..."}])
-    """
+    """LLM API 客户端。"""
 
     def __init__(self, config) -> None:
         """
@@ -119,7 +112,14 @@ class LLMAPIClient:
             except httpx.TimeoutException:
                 last_error = f"请求超时 ({self._timeout}s)"
                 if attempt < max_retries:
-                    logger.warning("LLM API 超时重试 %s/%s", attempt + 1, max_retries)
+                    wait = 2 ** attempt
+                    logger.warning(
+                        "LLM API 请求超时，准备重试 %s/%s，等待 %ss",
+                        attempt + 1,
+                        max_retries,
+                        wait,
+                    )
+                    time.sleep(wait)
                     continue
             except httpx.RequestError as exc:
                 last_error = f"网络错误: {exc}"
@@ -127,9 +127,7 @@ class LLMAPIClient:
                     time.sleep(2 ** attempt)
                     continue
 
-        raise RuntimeError(f"LLM API 调用失败（已重试 {max_retries} 次）: {last_error}")
-
-    WENHUA_SSE_URL: str = "https://swarm.wenhua.com.cn/aiservice/api/ShiXi/GetContent"
+        raise RuntimeError(f"LLM API 调用失败（尝试 {max_retries + 1} 次）: {last_error}")
 
     def _chat_wenhua(self, messages: list[dict], *, retries: int | None = None) -> str:
         """调用文华 ShiXi/GetContent SSE 接口并拼接完整回答。
@@ -220,7 +218,14 @@ class LLMAPIClient:
             except httpx.TimeoutException:
                 last_error = "请求超时 (connect=10s, read=120s)"
                 if attempt < max_retries:
-                    logger.warning("文华 SSE 超时重试 %s/%s", attempt + 1, max_retries)
+                    wait = 2 ** attempt
+                    logger.warning(
+                        "LLM API SSE 请求超时，准备重试 %s/%s，等待 %ss",
+                        attempt + 1,
+                        max_retries,
+                        wait,
+                    )
+                    time.sleep(wait)
                     continue
             except httpx.RequestError as exc:
                 last_error = f"网络错误: {exc}"
@@ -228,7 +233,7 @@ class LLMAPIClient:
                     time.sleep(2 ** attempt)
                     continue
 
-        raise RuntimeError(f"LLM API 调用失败（已重试 {max_retries} 次）: {last_error}")
+        raise RuntimeError(f"LLM API 调用失败（尝试 {max_retries + 1} 次）: {last_error}")
 
     @staticmethod
     def _messages_to_content(messages: list[dict]) -> str:

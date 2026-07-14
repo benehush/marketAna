@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 class LLMConfig:
     """LLM 推理配置，默认从 Settings 读取。"""
 
-    provider: str = "openai"
+    provider: str = "wenhua"
     api_key: str = ""
     base_url: str = ""
     model: str = ""
@@ -35,11 +35,12 @@ class LLMConfig:
 
         s = get_settings()
         return cls(
-            provider=(s.llm_provider or "openai").lower(),
+            provider=(s.llm_provider or "wenhua").lower(),
             api_key=s.llm_api_key or "",
             base_url=s.llm_base_url or "",
             model=s.llm_model or "",
             timeout_seconds=s.llm_timeout_seconds,
+            max_retries=s.llm_max_retries,
         )
 
 

@@ -34,9 +34,9 @@ def run_pipeline(article_id: int, session: Any) -> bool:
     流水线主入口，作为 pn03 Scheduler 的 pipeline_callback。
 
     按 article.status 决定从哪个阶段开始：
-      status=0  → 从头: parser→cleaner→refiner→rule_engine→(llm_infer)
-      status=1  → 续跑: cleaner→refiner→rule_engine→(llm_infer)
-      status=2  → 续跑: refiner→rule_engine→(llm_infer)
+      status=0  → 从头: parser→cleaner→product_segmenter→product_resolver→refiner→rule_engine→(llm_infer)
+      status=1  → 续跑: cleaner→product_segmenter→product_resolver→refiner→rule_engine→(llm_infer)
+      status=2  → 续跑: product_segmenter→product_resolver→refiner→rule_engine→(llm_infer)
       status=3  → 续跑: llm_infer
       status=5  → 已完成，跳过
       status=-1 → 根据 error_msg 判断从哪个阶段重试
@@ -106,6 +106,14 @@ def run_pipeline(article_id: int, session: Any) -> bool:
                 repo.update_status(article_id, ArticleProcessingStatus.CLEANED)
                 session.refresh(article)
                 current_status = 2
+            elif retry_from == "product_segmenter":
+                repo.update_status(article_id, ArticleProcessingStatus.CLEANED)
+                session.refresh(article)
+                current_status = 2
+            elif retry_from == "product_resolver":
+                repo.update_status(article_id, ArticleProcessingStatus.CLEANED)
+                session.refresh(article)
+                current_status = 2
             elif retry_from == "rule_engine":
                 repo.update_status(article_id, ArticleProcessingStatus.CLEANED)
                 session.refresh(article)
@@ -126,8 +134,12 @@ def run_pipeline(article_id: int, session: Any) -> bool:
             _run_cleaner(article_id, session, result)
             session.refresh(article)
 
-        # status=2: CLEANED → refiner(best-effort) → rule_engine
+        # status=2: CLEANED → segmenter → resolver(best-effort) → refiner → rules
         if article.status == ArticleProcessingStatus.CLEANED:
+            _run_product_segmenter(article_id, session, result)
+            session.refresh(article)
+            _run_product_resolver(article_id, session, result)
+            session.refresh(article)
             _run_refiner(article_id, session, result)
             session.refresh(article)
             need_llm = _run_rule_engine(article_id, session, result)
@@ -192,6 +204,22 @@ def _run_cleaner(article_id: int, session: Any, result: PipelineResult) -> None:
     clean_article(article_id, session)
 
 
+def _run_product_segmenter(article_id: int, session: Any, result: PipelineResult) -> None:
+    """执行 product_segmenter 阶段。"""
+    from pn05.product_segmenter import segment_article
+
+    result.stages_run.append("product_segmenter")
+    segment_article(article_id, session)
+
+
+def _run_product_resolver(article_id: int, session: Any, result: PipelineResult) -> None:
+    """执行 best-effort 未知品种归一化阶段。"""
+    from pn06.product_resolver import resolve_article_products
+
+    result.stages_run.append("product_resolver")
+    resolve_article_products(article_id, session)
+
+
 def _run_refiner(article_id: int, session: Any, result: PipelineResult) -> None:
     """执行 refiner 阶段；该阶段失败不阻塞后续分析。"""
     from pn05.refiner import refine_article
@@ -226,7 +254,7 @@ def _resolve_retry_stage(error_msg: str) -> str | None:
     """根据 error_msg 判断失败阶段，返回应从哪个阶段重试。"""
     msg_lower = error_msg.lower()
     # 按顺序检查：越早的阶段越优先
-    for stage in ["parser", "cleaner", "refiner", "rule_engine", "llm_infer"]:
+    for stage in ["parser", "cleaner", "product_segmenter", "product_resolver", "refiner", "rule_engine", "llm_infer"]:
         if stage in msg_lower:
             return stage
     # 无法判断 → 从头开始

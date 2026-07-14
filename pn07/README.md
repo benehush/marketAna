@@ -2,7 +2,7 @@
 
 ## 概述
 
-对 pn06 RuleEngine 无法高置信识别的文章，调用大语言模型（OpenAI 兼容 API）进行推理。通过结构化 Prompt 强制输出 JSON，解析后入库。低置信（<0.5）自动标记 `need_manual_review`。
+对 pn06 RuleEngine 无法高置信识别的文章，调用大语言模型进行推理。默认使用文华 `GetContent` SSE 接口，也保留 OpenAI 兼容 API 路径。通过结构化 Prompt 强制输出 JSON，解析后入库。低置信（<0.5）自动标记 `need_manual_review`。
 
 ## 目录结构
 
@@ -10,7 +10,7 @@
 pn07/
 ├── __init__.py          # 导出 infer_article, LLMConfig
 ├── llm_infer.py         # 主入口：编排完整推理流程
-├── llm_client.py        # httpx OpenAI 兼容 API 客户端（含重试）
+├── llm_client.py        # httpx LLM API 客户端（文华 SSE/OpenAI 兼容，含重试）
 ├── prompt_builder.py    # System/User prompt 模板
 ├── json_parser.py       # JSON 提取 + 修复 + 字段校验
 ├── models.py            # LLMConfig, InferResult

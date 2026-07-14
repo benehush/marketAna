@@ -1,0 +1,1890 @@
+[
+  {
+    "aliases": [
+      "铜",
+      "CU",
+      "沪铜",
+      "电解铜"
+    ],
+    "canonical": "沪铜",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])CU\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])CU\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 2308,
+    "exchange": "SHFE",
+    "group": "有色金属",
+    "negative_contexts": [
+      "LME",
+      "伦"
+    ],
+    "official_name": "铜",
+    "product_key": "SHFE.CU",
+    "symbol": "CU"
+  },
+  {
+    "aliases": [
+      "BC",
+      "bc",
+      "国际铜",
+      "铜BC"
+    ],
+    "canonical": "国际铜",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])BC\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])BC\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 628,
+    "exchange": "INE",
+    "group": "有色金属",
+    "negative_contexts": [],
+    "official_name": "国际铜",
+    "product_key": "INE.BC",
+    "symbol": "BC"
+  },
+  {
+    "aliases": [
+      "铝",
+      "AL",
+      "Al",
+      "沪铝",
+      "电解铝"
+    ],
+    "canonical": "沪铝",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])AL\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])AL\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 2560,
+    "exchange": "SHFE",
+    "group": "有色金属",
+    "negative_contexts": [
+      "LME",
+      "伦"
+    ],
+    "official_name": "铝",
+    "product_key": "SHFE.AL",
+    "symbol": "AL"
+  },
+  {
+    "aliases": [
+      "锌",
+      "ZN",
+      "沪锌"
+    ],
+    "canonical": "沪锌",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])ZN\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])ZN\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1055,
+    "exchange": "SHFE",
+    "group": "有色金属",
+    "negative_contexts": [
+      "LME",
+      "伦"
+    ],
+    "official_name": "锌",
+    "product_key": "SHFE.ZN",
+    "symbol": "ZN"
+  },
+  {
+    "aliases": [
+      "铅",
+      "PB",
+      "沪铅"
+    ],
+    "canonical": "沪铅",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])PB\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])PB\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 2548,
+    "exchange": "SHFE",
+    "group": "有色金属",
+    "negative_contexts": [
+      "LME",
+      "伦"
+    ],
+    "official_name": "铅",
+    "product_key": "SHFE.PB",
+    "symbol": "PB"
+  },
+  {
+    "aliases": [
+      "镍",
+      "NI",
+      "Ni",
+      "沪镍"
+    ],
+    "canonical": "沪镍",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])NI\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])NI\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1390,
+    "exchange": "SHFE",
+    "group": "有色金属",
+    "negative_contexts": [
+      "LME",
+      "伦"
+    ],
+    "official_name": "镍",
+    "product_key": "SHFE.NI",
+    "symbol": "NI"
+  },
+  {
+    "aliases": [
+      "锡",
+      "SN",
+      "sn",
+      "沪锡"
+    ],
+    "canonical": "沪锡",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])SN\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])SN\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1047,
+    "exchange": "SHFE",
+    "group": "有色金属",
+    "negative_contexts": [
+      "LME",
+      "伦"
+    ],
+    "official_name": "锡",
+    "product_key": "SHFE.SN",
+    "symbol": "SN"
+  },
+  {
+    "aliases": [
+      "AO",
+      "氧化铝"
+    ],
+    "canonical": "氧化铝",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])AO\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])AO\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 4541,
+    "exchange": "SHFE",
+    "group": "有色金属",
+    "negative_contexts": [],
+    "official_name": "氧化铝",
+    "product_key": "SHFE.AO",
+    "symbol": "AO"
+  },
+  {
+    "aliases": [
+      "AD",
+      "ad",
+      "铝合金",
+      "铸造铝合金"
+    ],
+    "canonical": "铸造铝合金",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])AD\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])AD\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1061,
+    "exchange": "SHFE",
+    "group": "有色金属",
+    "negative_contexts": [],
+    "official_name": "铸造铝合金",
+    "product_key": "SHFE.AD",
+    "symbol": "AD"
+  },
+  {
+    "aliases": [
+      "AU",
+      "Au",
+      "沪金",
+      "黄金"
+    ],
+    "canonical": "黄金",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])AU\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])AU\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 7013,
+    "exchange": "SHFE",
+    "group": "贵金属",
+    "negative_contexts": [
+      "COMEX"
+    ],
+    "official_name": "黄金",
+    "product_key": "SHFE.AU",
+    "symbol": "AU"
+  },
+  {
+    "aliases": [
+      "AG",
+      "Ag",
+      "沪银",
+      "白银"
+    ],
+    "canonical": "白银",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])AG\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])AG\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 4839,
+    "exchange": "SHFE",
+    "group": "贵金属",
+    "negative_contexts": [
+      "COMEX"
+    ],
+    "official_name": "白银",
+    "product_key": "SHFE.AG",
+    "symbol": "AG"
+  },
+  {
+    "aliases": [
+      "RB",
+      "螺纹",
+      "钢筋",
+      "螺纹钢",
+      "HRB400"
+    ],
+    "canonical": "螺纹钢",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])RB\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])RB\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 10465,
+    "exchange": "SHFE",
+    "group": "黑色金属",
+    "negative_contexts": [],
+    "official_name": "螺纹钢",
+    "product_key": "SHFE.RB",
+    "symbol": "RB"
+  },
+  {
+    "aliases": [
+      "WR",
+      "wr",
+      "盘条",
+      "线材"
+    ],
+    "canonical": "线材",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])WR\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])WR\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 549,
+    "exchange": "SHFE",
+    "group": "黑色金属",
+    "negative_contexts": [],
+    "official_name": "线材",
+    "product_key": "SHFE.WR",
+    "symbol": "WR"
+  },
+  {
+    "aliases": [
+      "HC",
+      "热卷",
+      "热轧卷板"
+    ],
+    "canonical": "热轧卷板",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])HC\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])HC\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 4436,
+    "exchange": "SHFE",
+    "group": "黑色金属",
+    "negative_contexts": [],
+    "official_name": "热轧卷板",
+    "product_key": "SHFE.HC",
+    "symbol": "HC"
+  },
+  {
+    "aliases": [
+      "SS",
+      "Ss",
+      "不锈钢",
+      "不锈钢期货"
+    ],
+    "canonical": "不锈钢",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])SS\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])SS\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 3004,
+    "exchange": "SHFE",
+    "group": "黑色金属",
+    "negative_contexts": [],
+    "official_name": "不锈钢",
+    "product_key": "SHFE.SS",
+    "symbol": "SS"
+  },
+  {
+    "aliases": [
+      "钢材"
+    ],
+    "canonical": "钢材",
+    "confidence": 1.0,
+    "contract_patterns": [],
+    "evidence_count": 2283,
+    "exchange": "SHFE",
+    "group": "黑色金属",
+    "negative_contexts": [],
+    "official_name": "钢材",
+    "product_key": "GROUP.SHFE.STEEL",
+    "symbol": ""
+  },
+  {
+    "aliases": [
+      "FU",
+      "燃油",
+      "燃料油"
+    ],
+    "canonical": "燃料油",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])FU\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])FU\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 2398,
+    "exchange": "SHFE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "燃料油",
+    "product_key": "SHFE.FU",
+    "symbol": "FU"
+  },
+  {
+    "aliases": [
+      "LU",
+      "LU燃油",
+      "低硫燃油",
+      "LU燃料油",
+      "低硫燃料油"
+    ],
+    "canonical": "低硫燃料油",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])LU\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])LU\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1184,
+    "exchange": "INE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "低硫燃料油",
+    "product_key": "INE.LU",
+    "symbol": "LU"
+  },
+  {
+    "aliases": [
+      "BU",
+      "沥青",
+      "石油沥青"
+    ],
+    "canonical": "沥青",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])BU\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])BU\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 3089,
+    "exchange": "SHFE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "石油沥青",
+    "product_key": "SHFE.BU",
+    "symbol": "BU"
+  },
+  {
+    "aliases": [
+      "BR",
+      "BR橡胶",
+      "丁二烯胶",
+      "合成橡胶",
+      "丁二烯橡胶"
+    ],
+    "canonical": "合成橡胶",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])BR\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])BR\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 2883,
+    "exchange": "SHFE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "丁二烯橡胶",
+    "product_key": "SHFE.BR",
+    "symbol": "BR"
+  },
+  {
+    "aliases": [
+      "RU",
+      "橡胶",
+      "沪胶",
+      "天然橡胶"
+    ],
+    "canonical": "天然橡胶",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])RU\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])RU\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 7484,
+    "exchange": "SHFE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "天然橡胶",
+    "product_key": "SHFE.RU",
+    "symbol": "RU"
+  },
+  {
+    "aliases": [
+      "NR",
+      "20号胶",
+      "二十号胶"
+    ],
+    "canonical": "20号胶",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])NR\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])NR\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1134,
+    "exchange": "INE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "20号胶",
+    "product_key": "INE.NR",
+    "symbol": "NR"
+  },
+  {
+    "aliases": [
+      "SP",
+      "纸浆",
+      "漂针浆"
+    ],
+    "canonical": "纸浆",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])SP\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])SP\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 712,
+    "exchange": "SHFE",
+    "group": "轻工",
+    "negative_contexts": [],
+    "official_name": "纸浆",
+    "product_key": "SHFE.SP",
+    "symbol": "SP"
+  },
+  {
+    "aliases": [
+      "OP",
+      "op",
+      "胶版纸",
+      "胶版印刷纸"
+    ],
+    "canonical": "胶版印刷纸",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])OP\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])OP\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 22067,
+    "exchange": "SHFE",
+    "group": "轻工",
+    "negative_contexts": [],
+    "official_name": "胶版印刷纸",
+    "product_key": "SHFE.OP",
+    "symbol": "OP"
+  },
+  {
+    "aliases": [
+      "SC",
+      "原油",
+      "SC原油"
+    ],
+    "canonical": "原油",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])SC\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])SC\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 10539,
+    "exchange": "INE",
+    "group": "能源化工",
+    "negative_contexts": [
+      "美",
+      "WTI",
+      "BRENT",
+      "Brent"
+    ],
+    "official_name": "原油",
+    "product_key": "INE.SC",
+    "symbol": "SC"
+  },
+  {
+    "aliases": [
+      "EC",
+      "欧集线",
+      "欧线集运",
+      "集运欧线",
+      "SCFIS欧线",
+      "集运指数(欧线",
+      "集运指数（欧线）"
+    ],
+    "canonical": "集运指数（欧线）",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])EC\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])EC\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 525,
+    "exchange": "INE",
+    "group": "航运指数",
+    "negative_contexts": [],
+    "official_name": "集运指数（欧线）",
+    "product_key": "INE.EC",
+    "symbol": "EC"
+  },
+  {
+    "aliases": [
+      "A",
+      "a",
+      "豆一",
+      "A豆一",
+      "黄大豆1号",
+      "黄大豆一号"
+    ],
+    "canonical": "豆一",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])A\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])A\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1018,
+    "exchange": "DCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "黄大豆1号",
+    "product_key": "DCE.A",
+    "symbol": "A"
+  },
+  {
+    "aliases": [
+      "B",
+      "豆二",
+      "B豆二",
+      "黄大豆2号",
+      "黄大豆二号"
+    ],
+    "canonical": "豆二",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])B\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])B\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 667,
+    "exchange": "DCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "黄大豆2号",
+    "product_key": "DCE.B",
+    "symbol": "B"
+  },
+  {
+    "aliases": [
+      "M",
+      "豆粕",
+      "豆粕合约",
+      "豆粕期货"
+    ],
+    "canonical": "豆粕",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])M\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])M\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 7316,
+    "exchange": "DCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "豆粕",
+    "product_key": "DCE.M",
+    "symbol": "M"
+  },
+  {
+    "aliases": [
+      "Y",
+      "豆油",
+      "Y豆油",
+      "豆油期货"
+    ],
+    "canonical": "豆油",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])Y\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])Y\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 5109,
+    "exchange": "DCE",
+    "group": "农产品",
+    "negative_contexts": [
+      "美"
+    ],
+    "official_name": "豆油",
+    "product_key": "DCE.Y",
+    "symbol": "Y"
+  },
+  {
+    "aliases": [
+      "P",
+      "棕榈",
+      "棕油",
+      "棕榈油"
+    ],
+    "canonical": "棕榈油",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])P\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])P\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 10999,
+    "exchange": "DCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "棕榈油",
+    "product_key": "DCE.P",
+    "symbol": "P"
+  },
+  {
+    "aliases": [
+      "C",
+      "玉米",
+      "C玉米",
+      "玉米期货"
+    ],
+    "canonical": "玉米",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])C\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])C\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 5551,
+    "exchange": "DCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "玉米",
+    "product_key": "DCE.C",
+    "symbol": "C"
+  },
+  {
+    "aliases": [
+      "CS",
+      "Cs",
+      "淀粉",
+      "玉米淀粉"
+    ],
+    "canonical": "玉米淀粉",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])CS\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])CS\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 2382,
+    "exchange": "DCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "玉米淀粉",
+    "product_key": "DCE.CS",
+    "symbol": "CS"
+  },
+  {
+    "aliases": [
+      "RR",
+      "粳米"
+    ],
+    "canonical": "粳米",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])RR\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])RR\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 603,
+    "exchange": "DCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "粳米",
+    "product_key": "DCE.RR",
+    "symbol": "RR"
+  },
+  {
+    "aliases": [
+      "JD",
+      "鸡蛋"
+    ],
+    "canonical": "鸡蛋",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])JD\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])JD\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 3218,
+    "exchange": "DCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "鸡蛋",
+    "product_key": "DCE.JD",
+    "symbol": "JD"
+  },
+  {
+    "aliases": [
+      "LH",
+      "生猪"
+    ],
+    "canonical": "生猪",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])LH\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])LH\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 4665,
+    "exchange": "DCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "生猪",
+    "product_key": "DCE.LH",
+    "symbol": "LH"
+  },
+  {
+    "aliases": [
+      "I",
+      "铁矿",
+      "铁矿石",
+      "铁精矿"
+    ],
+    "canonical": "铁矿石",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])I\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])I\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 9911,
+    "exchange": "DCE",
+    "group": "黑色金属",
+    "negative_contexts": [],
+    "official_name": "铁矿石",
+    "product_key": "DCE.I",
+    "symbol": "I"
+  },
+  {
+    "aliases": [
+      "J",
+      "焦炭",
+      "J焦炭",
+      "冶金焦"
+    ],
+    "canonical": "焦炭",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])J\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])J\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 4324,
+    "exchange": "DCE",
+    "group": "黑色金属",
+    "negative_contexts": [],
+    "official_name": "焦炭",
+    "product_key": "DCE.J",
+    "symbol": "J"
+  },
+  {
+    "aliases": [
+      "JM",
+      "焦煤",
+      "焦煤期货"
+    ],
+    "canonical": "焦煤",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])JM\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])JM\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 5397,
+    "exchange": "DCE",
+    "group": "黑色金属",
+    "negative_contexts": [],
+    "official_name": "焦煤",
+    "product_key": "DCE.JM",
+    "symbol": "JM"
+  },
+  {
+    "aliases": [
+      "L",
+      "l",
+      "PE",
+      "塑料",
+      "L塑料",
+      "聚乙烯",
+      "LLDPE",
+      "线型低密度聚乙烯"
+    ],
+    "canonical": "LLDPE",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])L\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])L\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 5727,
+    "exchange": "DCE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "线型低密度聚乙烯",
+    "product_key": "DCE.L",
+    "symbol": "L"
+  },
+  {
+    "aliases": [
+      "V",
+      "PVC",
+      "聚氯乙烯"
+    ],
+    "canonical": "PVC",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])V\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])V\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 3761,
+    "exchange": "DCE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "聚氯乙烯",
+    "product_key": "DCE.V",
+    "symbol": "V"
+  },
+  {
+    "aliases": [
+      "PP",
+      "聚丙烯"
+    ],
+    "canonical": "PP",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])PP\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])PP\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 7834,
+    "exchange": "DCE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "聚丙烯",
+    "product_key": "DCE.PP",
+    "symbol": "PP"
+  },
+  {
+    "aliases": [
+      "EG",
+      "MEG",
+      "乙二醇"
+    ],
+    "canonical": "乙二醇",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])EG\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])EG\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 3729,
+    "exchange": "DCE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "乙二醇",
+    "product_key": "DCE.EG",
+    "symbol": "EG"
+  },
+  {
+    "aliases": [
+      "EB",
+      "eb",
+      "苯乙烯"
+    ],
+    "canonical": "苯乙烯",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])EB\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])EB\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 3014,
+    "exchange": "DCE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "苯乙烯",
+    "product_key": "DCE.EB",
+    "symbol": "EB"
+  },
+  {
+    "aliases": [
+      "PG",
+      "LPG",
+      "液化气",
+      "液化石油气"
+    ],
+    "canonical": "液化气",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])PG\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])PG\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1922,
+    "exchange": "DCE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "液化石油气",
+    "product_key": "DCE.PG",
+    "symbol": "PG"
+  },
+  {
+    "aliases": [
+      "BZ",
+      "纯苯"
+    ],
+    "canonical": "纯苯",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])BZ\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])BZ\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1130,
+    "exchange": "DCE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "纯苯",
+    "product_key": "DCE.BZ",
+    "symbol": "BZ"
+  },
+  {
+    "aliases": [
+      "LG",
+      "lg",
+      "原木",
+      "LG原木",
+      "原木期货",
+      "针叶原木"
+    ],
+    "canonical": "原木",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])LG\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])LG\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 626,
+    "exchange": "DCE",
+    "group": "林产品",
+    "negative_contexts": [],
+    "official_name": "原木",
+    "product_key": "DCE.LG",
+    "symbol": "LG"
+  },
+  {
+    "aliases": [
+      "FB",
+      "fb",
+      "纤维板"
+    ],
+    "canonical": "纤维板",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])FB\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])FB\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 404,
+    "exchange": "DCE",
+    "group": "轻工",
+    "negative_contexts": [],
+    "official_name": "纤维板",
+    "product_key": "DCE.FB",
+    "symbol": "FB"
+  },
+  {
+    "aliases": [
+      "BB",
+      "bb",
+      "胶合板"
+    ],
+    "canonical": "胶合板",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])BB\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])BB\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 444,
+    "exchange": "DCE",
+    "group": "轻工",
+    "negative_contexts": [],
+    "official_name": "胶合板",
+    "product_key": "DCE.BB",
+    "symbol": "BB"
+  },
+  {
+    "aliases": [
+      "CF",
+      "棉花",
+      "郑棉"
+    ],
+    "canonical": "棉花",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])CF\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])CF\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 5703,
+    "exchange": "CZCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "棉花",
+    "product_key": "CZCE.CF",
+    "symbol": "CF"
+  },
+  {
+    "aliases": [
+      "CY",
+      "棉纱"
+    ],
+    "canonical": "棉纱",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])CY\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])CY\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1027,
+    "exchange": "CZCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "棉纱",
+    "product_key": "CZCE.CY",
+    "symbol": "CY"
+  },
+  {
+    "aliases": [
+      "SR",
+      "sr",
+      "白糖",
+      "郑糖"
+    ],
+    "canonical": "白糖",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])SR\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])SR\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 4225,
+    "exchange": "CZCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "白糖",
+    "product_key": "CZCE.SR",
+    "symbol": "SR"
+  },
+  {
+    "aliases": [
+      "OI",
+      "oi",
+      "菜油",
+      "郑油",
+      "菜籽油"
+    ],
+    "canonical": "菜油",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])OI\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])OI\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 9683,
+    "exchange": "CZCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "菜籽油",
+    "product_key": "CZCE.OI",
+    "symbol": "OI"
+  },
+  {
+    "aliases": [
+      "RM",
+      "菜粕",
+      "郑粕",
+      "菜籽粕"
+    ],
+    "canonical": "菜粕",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])RM\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])RM\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 3957,
+    "exchange": "CZCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "菜籽粕",
+    "product_key": "CZCE.RM",
+    "symbol": "RM"
+  },
+  {
+    "aliases": [
+      "RS",
+      "Rs",
+      "菜籽",
+      "油菜籽"
+    ],
+    "canonical": "油菜籽",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])RS\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])RS\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 3972,
+    "exchange": "CZCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "油菜籽",
+    "product_key": "CZCE.RS",
+    "symbol": "RS"
+  },
+  {
+    "aliases": [
+      "AP",
+      "苹果"
+    ],
+    "canonical": "苹果",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])AP\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])AP\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1585,
+    "exchange": "CZCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "苹果",
+    "product_key": "CZCE.AP",
+    "symbol": "AP"
+  },
+  {
+    "aliases": [
+      "CJ",
+      "红枣"
+    ],
+    "canonical": "红枣",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])CJ\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])CJ\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1126,
+    "exchange": "CZCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "红枣",
+    "product_key": "CZCE.CJ",
+    "symbol": "CJ"
+  },
+  {
+    "aliases": [
+      "PK",
+      "花生"
+    ],
+    "canonical": "花生",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])PK\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])PK\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1297,
+    "exchange": "CZCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "花生",
+    "product_key": "CZCE.PK",
+    "symbol": "PK"
+  },
+  {
+    "aliases": [
+      "WH",
+      "Wh",
+      "强麦",
+      "强筋小麦",
+      "优质强筋小麦"
+    ],
+    "canonical": "强麦",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])WH\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])WH\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 669,
+    "exchange": "CZCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "优质强筋小麦",
+    "product_key": "CZCE.WH",
+    "symbol": "WH"
+  },
+  {
+    "aliases": [
+      "PM",
+      "Pm",
+      "普麦",
+      "普通小麦"
+    ],
+    "canonical": "普麦",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])PM\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])PM\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 314,
+    "exchange": "CZCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "普通小麦",
+    "product_key": "CZCE.PM",
+    "symbol": "PM"
+  },
+  {
+    "aliases": [
+      "RI",
+      "早籼稻"
+    ],
+    "canonical": "早籼稻",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])RI\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])RI\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 736,
+    "exchange": "CZCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "早籼稻",
+    "product_key": "CZCE.RI",
+    "symbol": "RI"
+  },
+  {
+    "aliases": [
+      "JR",
+      "Jr",
+      "粳稻"
+    ],
+    "canonical": "粳稻",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])JR\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])JR\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 342,
+    "exchange": "CZCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "粳稻",
+    "product_key": "CZCE.JR",
+    "symbol": "JR"
+  },
+  {
+    "aliases": [
+      "LR",
+      "lR",
+      "晚籼稻"
+    ],
+    "canonical": "晚籼稻",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])LR\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])LR\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 333,
+    "exchange": "CZCE",
+    "group": "农产品",
+    "negative_contexts": [],
+    "official_name": "晚籼稻",
+    "product_key": "CZCE.LR",
+    "symbol": "LR"
+  },
+  {
+    "aliases": [
+      "TA",
+      "PTA",
+      "精对苯二甲酸"
+    ],
+    "canonical": "PTA",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])TA\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])TA\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 4947,
+    "exchange": "CZCE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "精对苯二甲酸",
+    "product_key": "CZCE.TA",
+    "symbol": "TA"
+  },
+  {
+    "aliases": [
+      "MA",
+      "甲醇",
+      "郑醇"
+    ],
+    "canonical": "甲醇",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])MA\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])MA\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 8132,
+    "exchange": "CZCE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "甲醇",
+    "product_key": "CZCE.MA",
+    "symbol": "MA"
+  },
+  {
+    "aliases": [
+      "FG",
+      "玻璃",
+      "郑玻"
+    ],
+    "canonical": "玻璃",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])FG\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])FG\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 5361,
+    "exchange": "CZCE",
+    "group": "建材",
+    "negative_contexts": [],
+    "official_name": "玻璃",
+    "product_key": "CZCE.FG",
+    "symbol": "FG"
+  },
+  {
+    "aliases": [
+      "UR",
+      "尿素"
+    ],
+    "canonical": "尿素",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])UR\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])UR\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 5945,
+    "exchange": "CZCE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "尿素",
+    "product_key": "CZCE.UR",
+    "symbol": "UR"
+  },
+  {
+    "aliases": [
+      "SA",
+      "纯碱",
+      "郑碱"
+    ],
+    "canonical": "纯碱",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])SA\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])SA\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 4649,
+    "exchange": "CZCE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "纯碱",
+    "product_key": "CZCE.SA",
+    "symbol": "SA"
+  },
+  {
+    "aliases": [
+      "PF",
+      "短纤",
+      "涤纶短纤"
+    ],
+    "canonical": "短纤",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])PF\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])PF\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 2079,
+    "exchange": "CZCE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "短纤",
+    "product_key": "CZCE.PF",
+    "symbol": "PF"
+  },
+  {
+    "aliases": [
+      "PX",
+      "对二甲苯"
+    ],
+    "canonical": "PX",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])PX\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])PX\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 4447,
+    "exchange": "CZCE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "对二甲苯",
+    "product_key": "CZCE.PX",
+    "symbol": "PX"
+  },
+  {
+    "aliases": [
+      "SH",
+      "烧碱"
+    ],
+    "canonical": "烧碱",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])SH\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])SH\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 3066,
+    "exchange": "CZCE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "烧碱",
+    "product_key": "CZCE.SH",
+    "symbol": "SH"
+  },
+  {
+    "aliases": [
+      "PR",
+      "瓶片",
+      "聚酯瓶片"
+    ],
+    "canonical": "瓶片",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])PR\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])PR\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1743,
+    "exchange": "CZCE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "瓶片",
+    "product_key": "CZCE.PR",
+    "symbol": "PR"
+  },
+  {
+    "aliases": [
+      "PL",
+      "丙烯"
+    ],
+    "canonical": "丙烯",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])PL\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])PL\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1642,
+    "exchange": "CZCE",
+    "group": "能源化工",
+    "negative_contexts": [],
+    "official_name": "丙烯",
+    "product_key": "CZCE.PL",
+    "symbol": "PL"
+  },
+  {
+    "aliases": [
+      "SF",
+      "硅铁"
+    ],
+    "canonical": "硅铁",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])SF\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])SF\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 2830,
+    "exchange": "CZCE",
+    "group": "黑色金属",
+    "negative_contexts": [],
+    "official_name": "硅铁",
+    "product_key": "CZCE.SF",
+    "symbol": "SF"
+  },
+  {
+    "aliases": [
+      "SM",
+      "硅锰",
+      "锰硅"
+    ],
+    "canonical": "锰硅",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])SM\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])SM\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 4475,
+    "exchange": "CZCE",
+    "group": "黑色金属",
+    "negative_contexts": [],
+    "official_name": "锰硅",
+    "product_key": "CZCE.SM",
+    "symbol": "SM"
+  },
+  {
+    "aliases": [
+      "ZC",
+      "郑煤",
+      "动力煤"
+    ],
+    "canonical": "动力煤",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])ZC\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])ZC\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1150,
+    "exchange": "CZCE",
+    "group": "能源",
+    "negative_contexts": [],
+    "official_name": "动力煤",
+    "product_key": "CZCE.ZC",
+    "symbol": "ZC"
+  },
+  {
+    "aliases": [
+      "SI",
+      "si",
+      "工业硅"
+    ],
+    "canonical": "工业硅",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])SI\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])SI\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 4147,
+    "exchange": "GFEX",
+    "group": "新能源材料",
+    "negative_contexts": [],
+    "official_name": "工业硅",
+    "product_key": "GFEX.SI",
+    "symbol": "SI"
+  },
+  {
+    "aliases": [
+      "LC",
+      "碳酸锂"
+    ],
+    "canonical": "碳酸锂",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])LC\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])LC\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 4567,
+    "exchange": "GFEX",
+    "group": "新能源材料",
+    "negative_contexts": [],
+    "official_name": "碳酸锂",
+    "product_key": "GFEX.LC",
+    "symbol": "LC"
+  },
+  {
+    "aliases": [
+      "PS",
+      "多晶硅"
+    ],
+    "canonical": "多晶硅",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])PS\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])PS\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 2676,
+    "exchange": "GFEX",
+    "group": "新能源材料",
+    "negative_contexts": [],
+    "official_name": "多晶硅",
+    "product_key": "GFEX.PS",
+    "symbol": "PS"
+  },
+  {
+    "aliases": [
+      "铂",
+      "PT",
+      "pT",
+      "铂金"
+    ],
+    "canonical": "铂",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])PT\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])PT\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 533,
+    "exchange": "GFEX",
+    "group": "贵金属",
+    "negative_contexts": [],
+    "official_name": "铂",
+    "product_key": "GFEX.PT",
+    "symbol": "PT"
+  },
+  {
+    "aliases": [
+      "钯",
+      "PD",
+      "pD",
+      "钯金"
+    ],
+    "canonical": "钯",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])PD\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])PD\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 510,
+    "exchange": "GFEX",
+    "group": "贵金属",
+    "negative_contexts": [],
+    "official_name": "钯",
+    "product_key": "GFEX.PD",
+    "symbol": "PD"
+  },
+  {
+    "aliases": [
+      "IF",
+      "IF股指",
+      "沪深300",
+      "沪深300股指",
+      "沪深300股指期货"
+    ],
+    "canonical": "沪深300股指",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])IF\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])IF\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 3347,
+    "exchange": "CFFEX",
+    "group": "股指期货",
+    "negative_contexts": [],
+    "official_name": "沪深300股指期货",
+    "product_key": "CFFEX.IF",
+    "symbol": "IF"
+  },
+  {
+    "aliases": [
+      "IH",
+      "IH股指",
+      "上证50",
+      "上证50股指",
+      "上证50股指期货"
+    ],
+    "canonical": "上证50股指",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])IH\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])IH\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 4753,
+    "exchange": "CFFEX",
+    "group": "股指期货",
+    "negative_contexts": [],
+    "official_name": "上证50股指期货",
+    "product_key": "CFFEX.IH",
+    "symbol": "IH"
+  },
+  {
+    "aliases": [
+      "IC",
+      "IC股指",
+      "中证500",
+      "中证500股指",
+      "中证500股指期货"
+    ],
+    "canonical": "中证500股指",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])IC\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])IC\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 2456,
+    "exchange": "CFFEX",
+    "group": "股指期货",
+    "negative_contexts": [],
+    "official_name": "中证500股指期货",
+    "product_key": "CFFEX.IC",
+    "symbol": "IC"
+  },
+  {
+    "aliases": [
+      "IM",
+      "IM股指",
+      "中证1000",
+      "中证1000股指",
+      "中证1000股指期货"
+    ],
+    "canonical": "中证1000股指",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])IM\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])IM\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 3978,
+    "exchange": "CFFEX",
+    "group": "股指期货",
+    "negative_contexts": [],
+    "official_name": "中证1000股指期货",
+    "product_key": "CFFEX.IM",
+    "symbol": "IM"
+  },
+  {
+    "aliases": [
+      "TS",
+      "二债",
+      "2年期国债",
+      "二年期国债",
+      "2年期国债期货"
+    ],
+    "canonical": "2年期国债",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])TS\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])TS\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1324,
+    "exchange": "CFFEX",
+    "group": "国债期货",
+    "negative_contexts": [],
+    "official_name": "2年期国债期货",
+    "product_key": "CFFEX.TS",
+    "symbol": "TS"
+  },
+  {
+    "aliases": [
+      "TF",
+      "五债",
+      "5年期国债",
+      "五年期国债",
+      "5年期国债期货"
+    ],
+    "canonical": "5年期国债",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])TF\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])TF\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1297,
+    "exchange": "CFFEX",
+    "group": "国债期货",
+    "negative_contexts": [],
+    "official_name": "5年期国债期货",
+    "product_key": "CFFEX.TF",
+    "symbol": "TF"
+  },
+  {
+    "aliases": [
+      "T",
+      "十债",
+      "十年期国债",
+      "10年期国债",
+      "10年期国债期货"
+    ],
+    "canonical": "10年期国债",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])T\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])T\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 504,
+    "exchange": "CFFEX",
+    "group": "国债期货",
+    "negative_contexts": [],
+    "official_name": "10年期国债期货",
+    "product_key": "CFFEX.T",
+    "symbol": "T"
+  },
+  {
+    "aliases": [
+      "TL",
+      "三十债",
+      "30年期国债",
+      "三十年期国债",
+      "30年期国债期货"
+    ],
+    "canonical": "30年期国债",
+    "confidence": 1.0,
+    "contract_patterns": [
+      "(?<![A-Za-z0-9])TL\\d{2,4}(?![A-Za-z0-9])",
+      "(?<![A-Za-z0-9])TL\\s*\\d{2,4}\\s*合约"
+    ],
+    "evidence_count": 1018,
+    "exchange": "CFFEX",
+    "group": "国债期货",
+    "negative_contexts": [],
+    "official_name": "30年期国债期货",
+    "product_key": "CFFEX.TL",
+    "symbol": "TL"
+  },
+  {
+    "aliases": [
+      "股指",
+      "股指期货"
+    ],
+    "canonical": "股指",
+    "confidence": 1.0,
+    "contract_patterns": [],
+    "evidence_count": 4774,
+    "exchange": "CFFEX",
+    "group": "股指期货",
+    "negative_contexts": [],
+    "official_name": "股指期货",
+    "product_key": "GROUP.CFFEX.INDEX",
+    "symbol": ""
+  },
+  {
+    "aliases": [
+      "国债",
+      "国债期货"
+    ],
+    "canonical": "国债",
+    "confidence": 1.0,
+    "contract_patterns": [],
+    "evidence_count": 5133,
+    "exchange": "CFFEX",
+    "group": "国债期货",
+    "negative_contexts": [],
+    "official_name": "国债期货",
+    "product_key": "GROUP.CFFEX.BOND",
+    "symbol": ""
+  }
+]

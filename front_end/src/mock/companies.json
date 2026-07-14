@@ -5,37 +5,37 @@
     {
       "company": "南华期货",
       "predictions": [
-        { "article_id": 1, "product": "螺纹钢", "direction": "看涨", "confidence": 0.82, "date": "2026-06-15" },
-        { "article_id": 11, "product": "铁矿石", "direction": "看涨", "confidence": 0.68, "date": "2026-06-15" },
-        { "article_id": 3, "product": "沪铜", "direction": "看涨", "confidence": 0.70, "date": "2026-06-15" },
-        { "article_id": 16, "product": "棕榈油", "direction": "中性", "confidence": 0.51, "date": "2026-06-15" },
-        { "article_id": 8, "product": "黄金", "direction": "看涨", "confidence": 0.85, "date": "2026-06-15" }
+        { "article_id": 1, "result_id": 1, "product": "螺纹钢", "direction": "看涨", "confidence": 0.82, "date": "2026-06-15" },
+        { "article_id": 11, "result_id": 11, "product": "铁矿石", "direction": "看涨", "confidence": 0.68, "date": "2026-06-15" },
+        { "article_id": 3, "result_id": 3, "product": "沪铜", "direction": "看涨", "confidence": 0.70, "date": "2026-06-15" },
+        { "article_id": 16, "result_id": 16, "product": "棕榈油", "direction": "中性", "confidence": 0.51, "date": "2026-06-15" },
+        { "article_id": 8, "result_id": 8, "product": "黄金", "direction": "看涨", "confidence": 0.85, "date": "2026-06-15" }
       ]
     },
     {
       "company": "中信期货",
       "predictions": [
-        { "article_id": 9, "product": "螺纹钢", "direction": "看跌", "confidence": 0.63, "date": "2026-06-16" },
-        { "article_id": 10, "product": "沪铜", "direction": "看跌", "confidence": 0.61, "date": "2026-06-16" },
-        { "article_id": 15, "product": "豆粕", "direction": "看跌", "confidence": 0.65, "date": "2026-06-16" },
-        { "article_id": 7, "product": "焦煤", "direction": "看跌", "confidence": 0.77, "date": "2026-06-16" }
+        { "article_id": 9, "result_id": 9, "product": "螺纹钢", "direction": "看跌", "confidence": 0.63, "date": "2026-06-16" },
+        { "article_id": 10, "result_id": 10, "product": "沪铜", "direction": "看跌", "confidence": 0.61, "date": "2026-06-16" },
+        { "article_id": 15, "result_id": 15, "product": "豆粕", "direction": "看跌", "confidence": 0.65, "date": "2026-06-16" },
+        { "article_id": 7, "result_id": 7, "product": "焦煤", "direction": "看跌", "confidence": 0.77, "date": "2026-06-16" }
       ]
     },
     {
       "company": "永安期货",
       "predictions": [
-        { "article_id": 2, "product": "铁矿石", "direction": "看涨", "confidence": 0.75, "date": "2026-06-14" },
-        { "article_id": 4, "product": "原油", "direction": "看涨", "confidence": 0.88, "date": "2026-06-18" },
-        { "article_id": 6, "product": "棕榈油", "direction": "看涨", "confidence": 0.69, "date": "2026-06-18" }
+        { "article_id": 2, "result_id": 2, "product": "铁矿石", "direction": "看涨", "confidence": 0.75, "date": "2026-06-14" },
+        { "article_id": 4, "result_id": 4, "product": "原油", "direction": "看涨", "confidence": 0.88, "date": "2026-06-18" },
+        { "article_id": 6, "result_id": 6, "product": "棕榈油", "direction": "看涨", "confidence": 0.69, "date": "2026-06-18" }
       ]
     },
     {
       "company": "国泰君安",
       "predictions": [
-        { "article_id": 12, "product": "铁矿石", "direction": "中性", "confidence": 0.52, "date": "2026-06-17" },
-        { "article_id": 13, "product": "沪铜", "direction": "中性", "confidence": 0.55, "date": "2026-06-17" },
-        { "article_id": 14, "product": "原油", "direction": "看涨", "confidence": 0.71, "date": "2026-06-17" },
-        { "article_id": 5, "product": "豆粕", "direction": "看跌", "confidence": 0.72, "date": "2026-06-17" }
+        { "article_id": 12, "result_id": 12, "product": "铁矿石", "direction": "中性", "confidence": 0.52, "date": "2026-06-17" },
+        { "article_id": 13, "result_id": 13, "product": "沪铜", "direction": "中性", "confidence": 0.55, "date": "2026-06-17" },
+        { "article_id": 14, "result_id": 14, "product": "原油", "direction": "看涨", "confidence": 0.71, "date": "2026-06-17" },
+        { "article_id": 5, "result_id": 5, "product": "豆粕", "direction": "看跌", "confidence": 0.72, "date": "2026-06-17" }
       ]
     }
   ]

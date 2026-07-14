@@ -21,3 +21,11 @@ def is_displayable_analysis_result(result: Any) -> bool:
 def displayable_product_clause(product_column: Any):
     product = func.trim(product_column)
     return and_(product != "", product != UNKNOWN_PRODUCT)
+
+
+def formal_analysis_clause(result_model: Any):
+    """Expose only finalized, displayable analysis results."""
+    return and_(
+        displayable_product_clause(result_model.product),
+        result_model.need_manual_review.is_(False),
+    )

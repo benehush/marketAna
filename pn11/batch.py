@@ -52,9 +52,11 @@ def batch_process(
     succeeded = 0
     failed = 0
 
+    effective_max_concurrency = _effective_max_concurrency(session_factory, max_concurrency)
+
     logger.info(
         "批量处理开始: %d 篇文章, 最大并发=%d",
-        len(article_ids), max_concurrency,
+        len(article_ids), effective_max_concurrency,
     )
 
     # 每篇文章在工作线程中独立处理
@@ -90,7 +92,7 @@ def batch_process(
         finally:
             session.close()
 
-    with ThreadPoolExecutor(max_workers=max_concurrency) as executor:
+    with ThreadPoolExecutor(max_workers=effective_max_concurrency) as executor:
         futures = {executor.submit(_process_one, aid): aid for aid in article_ids}
 
         for future in as_completed(futures):
@@ -125,3 +127,16 @@ def batch_process(
 
     logger.info("批量处理完成: %s", batch_result.summary())
     return batch_result
+
+
+def _effective_max_concurrency(session_factory: Callable[[], Any], requested: int) -> int:
+    """Avoid unsafe threaded writes on in-memory SQLite StaticPool test engines."""
+    requested = max(1, int(requested or 1))
+    bind = getattr(session_factory, "_engine", None)
+    if bind is None:
+        bind = getattr(session_factory, "kw", {}).get("bind")
+    dialect = getattr(getattr(bind, "dialect", None), "name", "")
+    pool_name = type(getattr(bind, "pool", None)).__name__
+    if dialect == "sqlite" and pool_name == "StaticPool":
+        return 1
+    return requested

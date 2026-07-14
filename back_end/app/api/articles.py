@@ -2,22 +2,27 @@
 文章接口 - 提供文章的列表查询与详情查看功能
 """
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from back_end.app.api.serializers import get_displayable_analysis_results, serialize_article_detail
 from back_end.app.core.database import get_session
+from back_end.app.core.config import get_settings
 from back_end.app.core.exceptions import AppException, ErrorCode
 from back_end.app.core.responses import success_response
 from back_end.app.repositories import ArticleRepository
 
 router = APIRouter(prefix="/api/articles", tags=["articles"])
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 @router.get("")
 def list_articles(
     product: str | None = None,
+    product_key: str | None = None,
     company: str | None = None,
     direction: str | None = None,
     status: int | None = None,
@@ -48,6 +53,7 @@ def list_articles(
     repository = ArticleRepository(session)
     items, _total = repository.list_articles(
         product=product,
+        product_key=product_key,
         company=company,
         direction=direction,
         status=status,
@@ -125,3 +131,21 @@ def get_article_detail(
             status_code=404,
         )
     return success_response(serialize_article_detail(article))
+
+
+@router.get("/{article_id}/source")
+def get_article_source(
+    article_id: int,
+    session: Session = Depends(get_session),
+):
+    article = ArticleRepository(session).get_article(article_id)
+    if article is None or not article.file_url:
+        raise AppException(ErrorCode.NOT_FOUND, "Article source not found", {"article_id": article_id}, 404)
+    data_root = (PROJECT_ROOT / get_settings().data_root).resolve()
+    source = Path(article.file_url)
+    source = source.resolve() if source.is_absolute() else (PROJECT_ROOT / source).resolve()
+    if not source.is_relative_to(data_root):
+        raise AppException(ErrorCode.VALIDATION_ERROR, "Article source is outside data root", {"article_id": article_id}, 403)
+    if not source.is_file():
+        raise AppException(ErrorCode.NOT_FOUND, "Article source file is missing", {"article_id": article_id}, 404)
+    return FileResponse(source, filename=source.name, content_disposition_type="inline")

@@ -6,10 +6,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from back_end.app.core.database import get_session
-from back_end.app.core.display import displayable_product_clause
+from back_end.app.core.display import formal_analysis_clause
 from back_end.app.core.responses import success_response
 from back_end.app.core.status import ArticleProcessingStatus
 from back_end.app.models import AnalysisResult, Article
+from data_proccessing.catalog import product_group
 
 
 router = APIRouter(prefix="/api/companies", tags=["companies"])
@@ -34,7 +35,7 @@ def get_companies(session: Session = Depends(get_session)) -> dict:
         .join(Article, Article.id == AnalysisResult.article_id)
         .where(
             Article.status == ArticleProcessingStatus.STORED.value,
-            displayable_product_clause(AnalysisResult.product),
+            formal_analysis_clause(AnalysisResult),
         )
         .order_by(Article.company.asc(), Article.publish_time.desc())
     )
@@ -57,6 +58,8 @@ def get_companies(session: Session = Depends(get_session)) -> dict:
             "article_id": article.id,
             "result_id": result.id,
             "product": result.product,
+            "product_key": result.product_key,
+            "product_group": product_group(result.product_key),
             "contract": result.contract,
             "direction": result.direction,
             "confidence": result.confidence,

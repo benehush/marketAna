@@ -54,3 +54,5 @@ __screenshots__/
 .venv
 
 data/
+
+tests/outputs/

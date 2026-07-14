@@ -30,6 +30,7 @@ def build_messages(
     publish_time: str = "",
     max_input_chars: int = 8000,
     rule_candidates: list[dict] | None = None,
+    product_segments: list[dict] | None = None,
 ) -> list[dict]:
     """
     构建 LLM messages。
@@ -69,6 +70,20 @@ def build_messages(
                 f"confidence={float(item.get('confidence') or 0):.2f}"
             )
         paaarts.append("规则引擎候选（请保留高置信结果，补全低置信或遗漏品种）：\n" + "\n".join(lines))
+
+    if product_segments:
+        segment_lines = []
+        for item in product_segments:
+            text = str(item.get("text") or "").strip()
+            if not text:
+                continue
+            heading = item.get("heading") or item.get("section_type") or "正文"
+            product = item.get("product") or "未知"
+            contract = item.get("contract") or ""
+            segment_lines.append(f"### {product} {contract} {heading}".strip())
+            segment_lines.append(text)
+        if segment_lines:
+            parts.append("按品种切分的正文（优先依据这些片段判断各品种）：\n" + "\n".join(segment_lines))
 
     # 正文（可能截断）
     if len(cleaned_text) > max_input_chars:

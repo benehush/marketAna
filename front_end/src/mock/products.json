@@ -5,57 +5,57 @@
     {
       "product": "螺纹钢",
       "predictions": [
-        { "article_id": 1, "direction": "看涨", "confidence": 0.82, "company": "南华期货", "date": "2026-06-15", "reason": "基建投资加速，需求端支撑较强" },
-        { "article_id": 9, "direction": "看跌", "confidence": 0.63, "company": "中信期货", "date": "2026-06-16", "reason": "房地产开工不及预期，库存累积" }
+        { "article_id": 1, "result_id": 1, "direction": "看涨", "confidence": 0.82, "company": "南华期货", "date": "2026-06-15", "reason": "基建投资加速，需求端支撑较强" },
+        { "article_id": 9, "result_id": 9, "direction": "看跌", "confidence": 0.63, "company": "中信期货", "date": "2026-06-16", "reason": "房地产开工不及预期，库存累积" }
       ]
     },
     {
       "product": "铁矿石",
       "predictions": [
-        { "article_id": 2, "direction": "看涨", "confidence": 0.75, "company": "永安期货", "date": "2026-06-14", "reason": "海外发运减少，港口库存下降" },
-        { "article_id": 11, "direction": "看涨", "confidence": 0.68, "company": "南华期货", "date": "2026-06-15", "reason": "钢厂补库需求释放" },
-        { "article_id": 12, "direction": "中性", "confidence": 0.52, "company": "国泰君安", "date": "2026-06-17", "reason": "供需双弱，短期震荡" }
+        { "article_id": 2, "result_id": 2, "direction": "看涨", "confidence": 0.75, "company": "永安期货", "date": "2026-06-14", "reason": "海外发运减少，港口库存下降" },
+        { "article_id": 11, "result_id": 11, "direction": "看涨", "confidence": 0.68, "company": "南华期货", "date": "2026-06-15", "reason": "钢厂补库需求释放" },
+        { "article_id": 12, "result_id": 12, "direction": "中性", "confidence": 0.52, "company": "国泰君安", "date": "2026-06-17", "reason": "供需双弱，短期震荡" }
       ]
     },
     {
       "product": "沪铜",
       "predictions": [
-        { "article_id": 13, "direction": "中性", "confidence": 0.55, "company": "国泰君安", "date": "2026-06-17", "reason": "宏观情绪中性，库存处于历史中位" },
-        { "article_id": 3, "direction": "看涨", "confidence": 0.70, "company": "南华期货", "date": "2026-06-15", "reason": "新能源需求拉动，铜矿供给偏紧" },
-        { "article_id": 10, "direction": "看跌", "confidence": 0.61, "company": "中信期货", "date": "2026-06-16", "reason": "全球经济放缓预期压制铜价" }
+        { "article_id": 13, "result_id": 13, "direction": "中性", "confidence": 0.55, "company": "国泰君安", "date": "2026-06-17", "reason": "宏观情绪中性，库存处于历史中位" },
+        { "article_id": 3, "result_id": 3, "direction": "看涨", "confidence": 0.70, "company": "南华期货", "date": "2026-06-15", "reason": "新能源需求拉动，铜矿供给偏紧" },
+        { "article_id": 10, "result_id": 10, "direction": "看跌", "confidence": 0.61, "company": "中信期货", "date": "2026-06-16", "reason": "全球经济放缓预期压制铜价" }
       ]
     },
     {
       "product": "原油",
       "predictions": [
-        { "article_id": 4, "direction": "看涨", "confidence": 0.88, "company": "永安期货", "date": "2026-06-18", "reason": "OPEC+减产延续，地缘风险溢价" },
-        { "article_id": 14, "direction": "看涨", "confidence": 0.71, "company": "国泰君安", "date": "2026-06-17", "reason": "夏季出行高峰，需求攀升" }
+        { "article_id": 4, "result_id": 4, "direction": "看涨", "confidence": 0.88, "company": "永安期货", "date": "2026-06-18", "reason": "OPEC+减产延续，地缘风险溢价" },
+        { "article_id": 14, "result_id": 14, "direction": "看涨", "confidence": 0.71, "company": "国泰君安", "date": "2026-06-17", "reason": "夏季出行高峰，需求攀升" }
       ]
     },
     {
       "product": "豆粕",
       "predictions": [
-        { "article_id": 5, "direction": "看跌", "confidence": 0.72, "company": "国泰君安", "date": "2026-06-17", "reason": "南美丰产预期，到港量增加" },
-        { "article_id": 15, "direction": "看跌", "confidence": 0.65, "company": "中信期货", "date": "2026-06-16", "reason": "养殖利润下滑，饲料需求走弱" }
+        { "article_id": 5, "result_id": 5, "direction": "看跌", "confidence": 0.72, "company": "国泰君安", "date": "2026-06-17", "reason": "南美丰产预期，到港量增加" },
+        { "article_id": 15, "result_id": 15, "direction": "看跌", "confidence": 0.65, "company": "中信期货", "date": "2026-06-16", "reason": "养殖利润下滑，饲料需求走弱" }
       ]
     },
     {
       "product": "棕榈油",
       "predictions": [
-        { "article_id": 6, "direction": "看涨", "confidence": 0.69, "company": "永安期货", "date": "2026-06-18", "reason": "产地进入减产季，库存偏低" },
-        { "article_id": 16, "direction": "中性", "confidence": 0.51, "company": "南华期货", "date": "2026-06-15", "reason": "替代油脂价差收窄，方向不明" }
+        { "article_id": 6, "result_id": 6, "direction": "看涨", "confidence": 0.69, "company": "永安期货", "date": "2026-06-18", "reason": "产地进入减产季，库存偏低" },
+        { "article_id": 16, "result_id": 16, "direction": "中性", "confidence": 0.51, "company": "南华期货", "date": "2026-06-15", "reason": "替代油脂价差收窄，方向不明" }
       ]
     },
     {
       "product": "焦煤",
       "predictions": [
-        { "article_id": 7, "direction": "看跌", "confidence": 0.77, "company": "中信期货", "date": "2026-06-16", "reason": "钢厂限产，焦化厂开工率下降" }
+        { "article_id": 7, "result_id": 7, "direction": "看跌", "confidence": 0.77, "company": "中信期货", "date": "2026-06-16", "reason": "钢厂限产，焦化厂开工率下降" }
       ]
     },
     {
       "product": "黄金",
       "predictions": [
-        { "article_id": 8, "direction": "看涨", "confidence": 0.85, "company": "南华期货", "date": "2026-06-15", "reason": "美联储降息预期升温，避险需求增加" }
+        { "article_id": 8, "result_id": 8, "direction": "看涨", "confidence": 0.85, "company": "南华期货", "date": "2026-06-15", "reason": "美联储降息预期升温，避险需求增加" }
       ]
     }
   ]

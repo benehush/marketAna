@@ -17,7 +17,9 @@ from back_end.app.core.status import ArticleProcessingStatus
 from pn06.confidence import calculate_confidence
 from pn06.direction_rules import detect_direction, extract_reason
 from pn06.models import RuleBatchResult, RuleConfig, RuleResult
+from pn06.product_catalog import product_for_symbol, product_key_for_name
 from pn06.product_dict import detect_products
+from pn06.reason_refiner import refine_rule_reason
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +31,7 @@ def analyze_article(
     session: Any,
     *,
     config: RuleConfig | None = None,
+    reason_llm_enabled: bool = True,
 ) -> RuleBatchResult:
     """
     对单篇文章的 cleaned_text 执行规则识别。
@@ -67,8 +70,10 @@ def analyze_article(
         raise _fail(repo, article_id, "cleaned_text 为空")
 
     try:
-        # 2-5. 按 05 清洗后的 Markdown/小节切片做局部识别
-        candidates = _build_product_candidates(cleaned_text)
+        # 2-5. 优先按持久化品种分段做局部识别；无分段时回退旧的 Markdown/小节切片。
+        candidates = _build_product_candidates_from_segments(getattr(article, "product_segments", []) or [])
+        if not candidates:
+            candidates = _build_product_candidates(cleaned_text)
         results: list[RuleResult] = []
         for candidate in candidates:
             product = candidate["product"]
@@ -90,7 +95,11 @@ def analyze_article(
                     need_llm=need_llm,
                     detail={
                         **dir_result,
+                        "product_key": candidate.get("product_key") or product_key_for_name(product),
                         "contract": contract,
+                        "section_type": candidate.get("section_type"),
+                        "segment_id": candidate.get("segment_id"),
+                        "source_text": section_text,
                     },
                 )
             )
@@ -109,22 +118,36 @@ def analyze_article(
         high_results = result.high_confidence_results
         if high_results:
             primary = max(high_results, key=lambda item: item.confidence)
-            repo.save_analysis_results(
-                article_id,
-                [
+            save_items: list[dict[str, Any]] = []
+            for item in high_results:
+                if not item.product or not item.direction:
+                    continue
+                display_reason = refine_rule_reason(
+                    article_id=article_id,
+                    repo=repo,
+                    product=item.product,
+                    direction=item.direction,
+                    reason=item.reason or f"规则识别: {item.direction}",
+                    source_text=str(item.detail.get("source_text") or ""),
+                    enable_llm=reason_llm_enabled and bool(item.detail.get("segment_id")),
+                )
+                item.reason = display_reason
+                save_items.append(
                     {
                         "product": item.product,
+                        "product_key": str(item.detail.get("product_key") or product_key_for_name(item.product)),
                         "contract": item.detail.get("contract"),
                         "direction": item.direction,
-                        "reason": item.reason or f"规则识别: {item.direction}",
+                        "reason": display_reason,
                         "confidence": item.confidence,
                         "analysis_method": "rule",
                         "need_manual_review": False,
                         "is_primary": item is primary,
                     }
-                    for item in high_results
-                    if item.product and item.direction
-                ],
+                )
+            repo.save_analysis_results(
+                article_id,
+                save_items,
                 mark_stored=not result.need_llm,
             )
 
@@ -169,6 +192,7 @@ def _build_product_candidates(text: str) -> list[dict[str, str | None]]:
             contract = _extract_contract(local_text)
             key = (product, _contract_key(contract))
             candidates.setdefault(key, {"product": product, "contract": contract, "parts": []})
+            candidates[key]["product_key"] = product_key_for_name(product)
             candidates[key]["parts"].append(local_text)
 
     if not candidates:
@@ -177,13 +201,59 @@ def _build_product_candidates(text: str) -> list[dict[str, str | None]]:
             contract = _extract_contract(local_text)
             key = (product, _contract_key(contract))
             candidates.setdefault(key, {"product": product, "contract": contract, "parts": []})
+            candidates[key]["product_key"] = product_key_for_name(product)
             candidates[key]["parts"].append(local_text)
 
     return [
         {
             "product": str(candidate["product"]),
+            "product_key": str(candidate.get("product_key") or ""),
             "contract": candidate["contract"],
             "text": "\n".join(candidate["parts"]),
+        }
+        for candidate in candidates.values()
+        if any(str(part).strip() for part in candidate["parts"])
+    ]
+
+
+def _build_product_candidates_from_segments(segments: list[Any]) -> list[dict[str, str | None]]:
+    """从 article_product_segments 构建规则识别候选。"""
+    candidates: dict[tuple[str, str], dict[str, Any]] = {}
+    sorted_segments = sorted(
+        segments,
+        key=lambda segment: (getattr(segment, "segment_index", 0), getattr(segment, "id", 0) or 0),
+    )
+    for segment in sorted_segments:
+        product = (getattr(segment, "product", "") or "").strip()
+        text = (getattr(segment, "cleaned_text", "") or "").strip()
+        section_type = (getattr(segment, "section_type", "") or "").strip()
+        if not product or product == "未知" or section_type == "unknown" or not text:
+            continue
+        contract = getattr(segment, "contract", None)
+        key = (product, _contract_key(contract))
+        candidates.setdefault(
+            key,
+            {
+                "product": product,
+                "product_key": str(getattr(segment, "product_key", "") or product_key_for_name(product)),
+                "contract": contract,
+                "parts": [],
+                "section_types": [],
+                "segment_ids": [],
+            },
+        )
+        candidates[key]["parts"].append(text)
+        candidates[key]["section_types"].append(section_type)
+        candidates[key]["segment_ids"].append(str(getattr(segment, "id", "") or ""))
+
+    return [
+        {
+            "product": str(candidate["product"]),
+            "product_key": str(candidate.get("product_key") or ""),
+            "contract": candidate["contract"],
+            "text": "\n".join(candidate["parts"]),
+            "section_type": ",".join(dict.fromkeys(candidate["section_types"])),
+            "segment_id": ",".join(item for item in candidate["segment_ids"] if item),
         }
         for candidate in candidates.values()
         if any(str(part).strip() for part in candidate["parts"])
@@ -257,14 +327,12 @@ def _product_aliases(product: str) -> list[str]:
 
 
 def _extract_contract(text: str) -> str | None:
-    patterns = [
-        r"\b([A-Za-z]{1,3}\d{3,4})\b",
-        r"([0-9]{2,4})\s*合约",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, text)
-        if match:
-            return match.group(1)
+    for match in re.finditer(r"\b([A-Za-z]{1,3})(\d{3,4})\b", text):
+        if product_for_symbol(match.group(1)) is not None:
+            return match.group(0)
+    match = re.search(r"([0-9]{2,4})\s*合约", text)
+    if match:
+        return match.group(1)
     return None
 
 

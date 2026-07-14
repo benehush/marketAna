@@ -8,9 +8,10 @@ from back_end.app.api.schemas import TaskRunRequest
 from back_end.app.core.config import get_settings
 from back_end.app.core.database import get_session
 from back_end.app.core.responses import success_response
-from back_end.app.repositories import ArticleRepository
+from back_end.app.repositories.articles import ArticleRepository
 from back_end.app.tasks.scheduler import create_session_factory
-from pn11 import batch_process, run_pipeline
+from back_end.app.services.batch import batch_process
+from back_end.app.services.pipeline import run_pipeline
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 

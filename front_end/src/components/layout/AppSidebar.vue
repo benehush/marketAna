@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { getReviewQueue } from '../../api/client'
 
 const route = useRoute()
 
@@ -7,12 +9,25 @@ const menuItems = [
   { name: '品种', path: '/products', icon: '📊' },
   { name: '期货公司', path: '/companies', icon: '🏢' },
   { name: '趋势分析', path: '/trends', icon: '📈' },
-  { name: '资讯', path: '/articles', icon: '📰' },
+  { name: '审核队列', path: '/review-queue', icon: '✓' },
 ]
+const pendingCount = ref(0)
 
 function isActive(path: string) {
-  return route.path === path
+  if (route.path === path || (path === '/review-queue' && route.path.startsWith('/articles/'))) {
+    return true
+  }
+  if (!route.path.startsWith('/analysis-results/')) return false
+  const source = route.query.from === 'companies' ? '/companies' : '/products'
+  return path === source
 }
+
+onMounted(async () => {
+  try {
+    const result = await getReviewQueue(new URLSearchParams({ tab: 'pending', page: '1', page_size: '1' }))
+    pendingCount.value = result.data.counts.pending
+  } catch { pendingCount.value = 0 }
+})
 </script>
 
 <template>
@@ -31,6 +46,7 @@ function isActive(path: string) {
       >
         <span class="nav-icon">{{ item.icon }}</span>
         <span class="nav-label">{{ item.name }}</span>
+        <span v-if="item.path === '/review-queue' && pendingCount" class="nav-badge">{{ pendingCount }}</span>
       </router-link>
     </nav>
   </aside>
@@ -101,6 +117,8 @@ function isActive(path: string) {
   width: 24px;
   text-align: center;
 }
+
+.nav-badge { background:#e74c3c; border-radius:999px; color:#fff; font-size:11px; margin-left:auto; min-width:20px; padding:1px 6px; text-align:center; }
 
 .nav-label {
   font-size: 14px;

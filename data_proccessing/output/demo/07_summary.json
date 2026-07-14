@@ -1,0 +1,17 @@
+{
+  "source_id": "data/20250401/东海期货_323471.PDF",
+  "processing_stats": {
+    "match_count": 125,
+    "signal_count": 207,
+    "rule_count": 24,
+    "llm_count": 0,
+    "review_count": 5,
+    "duration_ms": 44.67,
+    "pipeline_version": "data-processing-v1"
+  },
+  "errors": [],
+  "match_count": 125,
+  "signal_count": 207,
+  "analysis_count": 24,
+  "review_count": 5
+}
