@@ -37,6 +37,7 @@ def to_canonical_result(
     """
     document = result.document
     cleaned_text = document.cleaned_text or str(document.metadata.get("cleaned_text") or document.raw_text)
+    context_window = _context_window(result)
     results = [
         _result_to_dict(
             item,
@@ -44,6 +45,7 @@ def to_canonical_result(
             raw_text=document.raw_text,
             signals=list(result.signals),
             matches=list(result.matches),
+            context_window=context_window,
         )
         for item in result.analyses
         if item.product_key and item.direction in _DIRECTIONS and item.method in _METHODS
@@ -115,6 +117,7 @@ def _result_to_dict(
     raw_text: str,
     signals: list[DirectionSignal],
     matches: list[LexiconMatch],
+    context_window: int = 80,
 ) -> dict[str, Any]:
     if item.method == "llm":
         evidence = build_validated_llm_evidence(
@@ -122,6 +125,7 @@ def _result_to_dict(
             raw_text=raw_text,
             matches=matches,
             excerpts=list(item.evidence_excerpts),
+            context_window=context_window,
         )
         reason = item.reason
     else:
@@ -132,6 +136,7 @@ def _result_to_dict(
             raw_text=raw_text,
             signals=signals,
             matches=matches,
+            context_window=context_window,
         )
         reason = evidence["summary"]
     return {
@@ -162,6 +167,7 @@ def build_product_evidence(
     signals: list[DirectionSignal],
     matches: list[LexiconMatch],
     allow_cross_product: bool = False,
+    context_window: int = 80,
 ) -> dict[str, Any]:
     # Signal offsets are produced from raw_text.  Only claim cleaned_text
     # offsets when both strings are identical; otherwise retain raw positions.
@@ -169,7 +175,13 @@ def build_product_evidence(
     source_text = cleaned_text if source_name == "cleaned_text" else raw_text
     product_matches = [match for match in matches if match.product_key == product_key]
     other_matches = [match for match in matches if match.product_key != product_key]
-    sections = _product_sections(source_text, product_key, product_matches, matches)
+    sections = _product_sections(
+        source_text,
+        product_key,
+        product_matches,
+        matches,
+        context_window=context_window,
+    )
     scoped_signals = [
         signal
         for signal in signals
@@ -260,6 +272,7 @@ def build_evidence_candidates(
     matches: list[LexiconMatch] | tuple[LexiconMatch, ...],
     max_candidates: int = 6,
     max_chars: int = 1200,
+    context_window: int = 80,
 ) -> tuple[EvidenceCandidate, ...]:
     """Build deterministic, source-addressable sentences for one product."""
     all_matches = tuple(matches)
@@ -269,6 +282,7 @@ def build_evidence_candidates(
         product_key=product_key,
         product_matches=product_matches,
         all_matches=all_matches,
+        context_window=context_window,
     )
     sections = build_product_sections(raw_text, all_matches)
     rows: list[tuple[int, int, str, str, bool, int]] = []
@@ -342,6 +356,7 @@ def build_validated_llm_evidence(
     raw_text: str,
     matches: list[LexiconMatch] | tuple[LexiconMatch, ...],
     excerpts: list[EvidenceExcerpt] | tuple[EvidenceExcerpt, ...],
+    context_window: int = 80,
 ) -> dict[str, Any]:
     product_matches = [match for match in matches if match.product_key == product_key]
     sections = product_section_spans(
@@ -349,6 +364,7 @@ def build_validated_llm_evidence(
         product_key=product_key,
         product_matches=product_matches,
         all_matches=matches,
+        context_window=context_window,
     )
     valid: list[dict[str, Any]] = []
     for excerpt in excerpts:
@@ -433,13 +449,23 @@ def _product_sections(
     product_key: str,
     product_matches: list[LexiconMatch],
     all_matches: list[LexiconMatch],
+    context_window: int = 80,
 ) -> list[tuple[int, int]]:
     return product_section_spans(
         text,
         product_key=product_key,
         product_matches=product_matches,
         all_matches=all_matches,
+        context_window=context_window,
     )
+
+
+def _context_window(result: DocumentProcessingResult) -> int:
+    value = result.processing_stats.get("context_window", 80)
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 80
 
 
 def _complete_sentence_span(
@@ -449,7 +475,10 @@ def _complete_sentence_span(
     section_start: int,
     section_end: int,
 ) -> tuple[int, int] | None:
-    previous = max(text.rfind(mark, section_start, signal_start) for mark in _SENTENCE_ENDINGS)
+    previous = max(
+        text.rfind(mark, section_start, signal_start)
+        for mark in (*_SENTENCE_ENDINGS, "|")
+    )
     start = section_start if previous < 0 else previous + 1
     endings = [text.find(mark, signal_end, section_end) for mark in _SENTENCE_ENDINGS]
     endings = [position for position in endings if position >= 0]
@@ -511,8 +540,11 @@ def _contains_unexplained_other_product(
 def _sentence_spans(text: str, start: int, end: int) -> list[tuple[int, int]]:
     spans: list[tuple[int, int]] = []
     cursor = start
-    for found in re.finditer(r"[。！？!?]", text[start:end]):
+    for found in re.finditer(r"[。！？!?|]", text[start:end]):
         sentence_end = start + found.end()
+        if text[sentence_end - 1] == "|":
+            cursor = sentence_end
+            continue
         sentence_start = cursor
         while sentence_start < sentence_end and text[sentence_start].isspace():
             sentence_start += 1

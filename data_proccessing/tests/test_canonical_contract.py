@@ -168,6 +168,20 @@ def test_candidates_exclude_other_product_only_sentence() -> None:
     assert all("玉米淀粉消费较差" not in item.quote for item in candidates)
 
 
+def test_candidates_use_context_window_when_document_has_no_bracket_headings() -> None:
+    text = "塑料价格上涨，供应压力缓解，短期偏强。聚丙烯库存增加，价格下跌，短期偏弱。"
+    matches = (
+        _match(text, "塑料", "DCE.L", "LLDPE"),
+        _match(text, "聚丙烯", "DCE.PP", "PP"),
+    )
+
+    lldpe = build_evidence_candidates(product_key="DCE.L", raw_text=text, matches=matches)
+    pp = build_evidence_candidates(product_key="DCE.PP", raw_text=text, matches=matches)
+
+    assert lldpe[0].quote == "塑料价格上涨，供应压力缓解，短期偏强。"
+    assert pp[0].quote == "聚丙烯库存增加，价格下跌，短期偏弱。"
+
+
 def test_shared_heading_target_clause_is_valid_rule_evidence() -> None:
     text = "【硅锰/硅铁】周一，硅锰现货价格持平，硅铁现货价格小幅回落。"
     matches = (

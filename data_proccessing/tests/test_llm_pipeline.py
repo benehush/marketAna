@@ -69,6 +69,23 @@ def test_pipeline_skip_llm_emits_review_queue() -> None:
     assert result.processing_stats["signal_count"] > 0
 
 
+def test_pipeline_uses_independent_context_windows_without_bracket_headings() -> None:
+    lexicon = RuntimeLexicon(
+        [
+            {"product_key": "DCE.L", "canonical": "LLDPE", "aliases": ["LLDPE", "塑料"], "negative_contexts": []},
+            {"product_key": "DCE.PP", "canonical": "PP", "aliases": ["PP", "聚丙烯"], "negative_contexts": []},
+        ]
+    )
+    text = "塑料价格上涨，供应压力缓解，短期偏强。聚丙烯库存增加，价格下跌，短期偏弱。"
+
+    result = process_document(Document("doc-context", text), lexicon, skip_llm=True)
+
+    analyses = {item.product_key: item for item in result.analyses}
+    assert set(analyses) == {"DCE.L", "DCE.PP"}
+    assert analyses["DCE.L"].reason == "塑料价格上涨，供应压力缓解，短期偏强。"
+    assert analyses["DCE.PP"].reason == "聚丙烯库存增加，价格下跌，短期偏弱。"
+
+
 def test_no_signal_review_keeps_owned_section_as_evidence() -> None:
     lexicon = RuntimeLexicon(
         [{"product_key": "SHFE.AL", "canonical": "沪铝", "aliases": ["铝"], "negative_contexts": []}]

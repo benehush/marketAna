@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import re
 import time
 from typing import Any
@@ -78,6 +78,7 @@ def process_document(
                 direction=arbitration.direction,
                 signals=signals,
                 matches=matches,
+                context_window=config.context_window,
             )
             rule_candidate = _rule_result(
                 document,
@@ -97,6 +98,7 @@ def process_document(
                 signals=signals,
                 matches=matches,
                 allow_cross_product=True,
+                context_window=config.context_window,
             )
             review_queue.append(
                 {
@@ -115,10 +117,29 @@ def process_document(
             matches=matches,
             max_candidates=config.max_llm_snippets,
             max_chars=config.max_llm_chars,
+            context_window=config.context_window,
         )
         if skip_llm or llm_client is None:
             if rule_candidate is not None:
                 analyses.append(rule_candidate)
+            else:
+                provisional = _provisional_rule_result(
+                    document,
+                    arbitration,
+                    evidence=_evidence_quotes(
+                        _quality_evidence(
+                            document,
+                            product_key=product_key,
+                            direction=None,
+                            signals=signals,
+                            matches=matches,
+                            allow_cross_product=False,
+                            context_window=config.context_window,
+                        )
+                    ),
+                )
+                if provisional is not None:
+                    analyses.append(provisional)
             review_queue.append({
                 "source_id": document.source_id,
                 "product_key": product_key,
@@ -130,6 +151,24 @@ def process_document(
         if not llm_candidates:
             if rule_candidate is not None:
                 analyses.append(rule_candidate)
+            else:
+                provisional = _provisional_rule_result(
+                    document,
+                    arbitration,
+                    evidence=_evidence_quotes(
+                        _quality_evidence(
+                            document,
+                            product_key=product_key,
+                            direction=None,
+                            signals=signals,
+                            matches=matches,
+                            allow_cross_product=False,
+                            context_window=config.context_window,
+                        )
+                    ),
+                )
+                if provisional is not None:
+                    analyses.append(provisional)
             review_queue.append({
                 "source_id": document.source_id,
                 "product_key": product_key,
@@ -295,6 +334,24 @@ def process_document(
         errors.append({"product_key": product_key, "diagnostic": diagnostic})
         if rule_candidate is not None:
             analyses.append(rule_candidate)
+        else:
+            provisional = _provisional_rule_result(
+                document,
+                arbitration,
+                evidence=_evidence_quotes(
+                    _quality_evidence(
+                        document,
+                        product_key=product_key,
+                        direction=None,
+                        signals=signals,
+                        matches=matches,
+                        allow_cross_product=False,
+                        context_window=config.context_window,
+                    )
+                ),
+            )
+            if provisional is not None:
+                analyses.append(provisional)
         review_queue.append({
             "source_id": document.source_id,
             "product_key": product_key,
@@ -329,6 +386,7 @@ def process_document(
                 signals=signals,
                 matches=matches,
                 allow_cross_product=True,
+                context_window=config.context_window,
             )
             reason = "no_signal"
         review_queue.append(
@@ -354,6 +412,7 @@ def process_document(
         "review_count": len(review_queue),
         "duration_ms": elapsed_ms,
         "pipeline_version": config.pipeline_version,
+        "context_window": config.context_window,
     }
     return DocumentProcessingResult(document, matches, signals, tuple(analyses), tuple(review_queue), tuple(errors), stats)
 
@@ -431,6 +490,30 @@ def _rule_result(
     )
 
 
+def _provisional_rule_result(
+    document: Document,
+    arbitration: Any,
+    *,
+    evidence: tuple[str, ...],
+) -> AnalysisResult | None:
+    """Keep a reviewable result when an uncertain product has no LLM path."""
+    if not arbitration.signals:
+        return None
+    scores = {
+        "看涨": arbitration.bullish_score,
+        "看跌": arbitration.bearish_score,
+        "中性": arbitration.neutral_score,
+    }
+    direction = max(scores, key=scores.get)
+    provisional = replace(arbitration, direction=direction)
+    return _rule_result(
+        document,
+        provisional,
+        evidence=evidence,
+        need_manual_review=True,
+    )
+
+
 def _quality_evidence(
     document: Document,
     *,
@@ -439,6 +522,7 @@ def _quality_evidence(
     signals: tuple[DirectionSignal, ...],
     matches: tuple[LexiconMatch, ...],
     allow_cross_product: bool = False,
+    context_window: int = 80,
 ) -> dict[str, Any]:
     cleaned_text = document.cleaned_text or str(document.metadata.get("cleaned_text") or document.raw_text)
     return build_product_evidence(
@@ -449,6 +533,7 @@ def _quality_evidence(
         signals=list(signals),
         matches=list(matches),
         allow_cross_product=allow_cross_product,
+        context_window=context_window,
     )
 
 

@@ -61,12 +61,10 @@ def product_section_spans(
     product_key: str,
     product_matches: Iterable[LexiconMatch],
     all_matches: Iterable[LexiconMatch],
+    context_window: int = 80,
 ) -> list[tuple[int, int]]:
     matches = tuple(all_matches)
     sections = build_product_sections(text, matches)
-    if not sections:
-        body_keys = {match.product_key for match in matches if match.start < len(text)}
-        return [(0, len(text))] if body_keys == {product_key} else []
 
     direct = [
         (section.body_start, section.body_end)
@@ -76,13 +74,30 @@ def product_section_spans(
     if direct:
         return direct
 
+    # A product that is not named by a bracket heading does not own an entire
+    # section. It still needs a deterministic scope for signals and evidence.
+    # Previously this returned no scope whenever another product was present,
+    # so signals could be extracted while every evidence sentence was dropped.
     own_matches = tuple(product_matches)
-    return [
-        (section.body_start, section.body_end)
-        for section in sections
-        if not section.product_keys
-        and any(section.body_start <= match.start < section.body_end for match in own_matches)
-    ]
+    spans: list[tuple[int, int]] = []
+    for match in own_matches:
+        start = max(0, match.start - max(0, context_window))
+        end = min(len(text), match.end + max(0, context_window))
+        section = section_for_position(sections, match.start)
+        if section is not None:
+            # Never let a fallback window cross a real chapter boundary.
+            start = max(start, section.body_start)
+            end = min(end, section.body_end)
+        if start < end:
+            spans.append((start, end))
+
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted(spans):
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return merged
 
 
 def is_related_mention_only(

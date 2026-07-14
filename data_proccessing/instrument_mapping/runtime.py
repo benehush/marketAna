@@ -38,7 +38,7 @@ class RuntimeLexicon:
             self._add_alias(alias, key, self._display_for(key), "approved_review")
         self._aliases = sorted(
             ((normalized, alias, key, display, source) for normalized, items in self._by_alias.items() for alias, key, display, source in items),
-            key=lambda item: len(item[1]),
+            key=lambda item: (len(item[1]), item[1].casefold(), item[2]),
             reverse=True,
         )
 
@@ -51,17 +51,30 @@ class RuntimeLexicon:
 
     def find_matches(self, text: str, *, title: str = "") -> list[LexiconMatch]:
         searchable = text or ""
-        matches: list[LexiconMatch] = []
-        occupied: list[tuple[int, int]] = []
+        candidates: list[tuple[int, int, str, str, str, str]] = []
         for normalized, alias, key, display, source in self._aliases:
             pattern = _alias_pattern(alias)
             for match in re.finditer(pattern, searchable, flags=re.IGNORECASE):
-                if _overlaps(match.start(), match.end(), occupied):
-                    continue
                 if self._negative_context(searchable, match.start(), key):
                     continue
-                matches.append(LexiconMatch(key, display, match.group(0), match.start(), match.end(), source, "body_alias"))
-                occupied.append((match.start(), match.end()))
+                candidates.append(
+                    (match.start(), match.end(), match.group(0), key, display, source)
+                )
+
+        # Discover every alias occurrence first, then resolve only genuinely
+        # overlapping aliases by longest span.  Matching while iterating the
+        # dictionary made discovery depend on alias order (and could let a
+        # short alias hide a longer one).
+        matches: list[LexiconMatch] = []
+        occupied: list[tuple[int, int]] = []
+        for start, end, raw_alias, key, display, source in sorted(
+            candidates,
+            key=lambda item: (item[0], -(item[1] - item[0]), item[3], item[2].casefold()),
+        ):
+            if _overlaps(start, end, occupied):
+                continue
+            matches.append(LexiconMatch(key, display, raw_alias, start, end, source, "body_alias"))
+            occupied.append((start, end))
         if title:
             for match in self._title_matches(title):
                 if not _overlaps(match.start, match.end, [(item.start, item.end) for item in matches]):

@@ -63,22 +63,48 @@ def extract_signals(
             if product_match.product_key in section.product_keys:
                 # The complete owned section was already extracted above.
                 continue
-            if section.concrete_product_keys:
-                # Mentions inside another concrete product's section are
-                # context, not independent directional subjects.
-                continue
         window_start = max(0, product_match.start - context_window)
         window_end = min(len(text), product_match.end + context_window)
+        if section is not None:
+            window_start = max(window_start, section.body_start)
+            window_end = min(window_end, section.body_end)
+        extracted = _extract_span(
+            text,
+            start_offset=window_start,
+            end_offset=window_end,
+            product_key=product_match.product_key,
+            raw_alias=product_match.alias,
+        )
+        # A fallback window may contain a neighbouring product's signal. Keep
+        # only signals whose nearest clause/sentence anchor is this product.
         signals.extend(
-            _extract_span(
-                text,
-                start_offset=window_start,
-                end_offset=window_end,
-                product_key=product_match.product_key,
-                raw_alias=product_match.alias,
-            )
+            signal
+            for signal in extracted
+            if _context_signal_owner(text, signal, product_match, all_matches, window_start, window_end)
+            == product_match.product_key
         )
     return _deduplicate(signals)
+
+
+def _context_signal_owner(
+    text: str,
+    signal: DirectionSignal,
+    product_match: LexiconMatch,
+    matches: tuple[LexiconMatch, ...],
+    lower: int,
+    upper: int,
+) -> str | None:
+    anchors = tuple(
+        match
+        for match in matches
+        if lower <= match.start < upper and match.end > lower
+    )
+    clause = _bounded_span(text, signal.start, signal.end, lower, upper, "，,；;。！？!?\n")
+    owner = _nearest_unique_owner(signal.start, anchors, *clause)
+    if owner is not None:
+        return owner
+    sentence = _bounded_span(text, signal.start, signal.end, lower, upper, "。！？!?\n")
+    return _nearest_unique_owner(signal.start, anchors, *sentence)
 
 
 def _shared_signal_owner(
