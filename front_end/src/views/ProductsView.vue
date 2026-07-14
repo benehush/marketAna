@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import type { ProductItem } from '../api/types'
 import { getProducts } from '../api/client'
 import ProductCard from '../components/products/ProductCard.vue'
@@ -10,6 +10,10 @@ import ErrorState from '../components/common/ErrorState.vue'
 const products = ref<ProductItem[]>([])
 const loading = ref(true)
 const error = ref('')
+
+const sortedProducts = computed(() => {
+  return [...products.value].sort((a, b) => a.product.localeCompare(b.product, 'zh-CN'))
+})
 
 async function fetchData() {
   loading.value = true
@@ -44,7 +48,7 @@ onMounted(fetchData)
 
     <div v-else class="card-grid">
       <ProductCard
-        v-for="item in products"
+        v-for="item in sortedProducts"
         :key="item.product"
         :product="item"
       />
