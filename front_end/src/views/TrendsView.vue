@@ -36,10 +36,7 @@ onMounted(fetchData)
     <div class="page-header">
       <h1 class="page-title">趋势分析</h1>
       <p class="page-desc">
-        品种涨跌热力图 ·
-        <span class="legend-red">红色=看涨</span> ·
-        <span class="legend-green">绿色=看跌</span> ·
-        <span class="legend-gray">灰色=中性</span>
+        X 轴=时间 · Y 轴=品种 · 红色=看涨 绿色=看跌
       </p>
     </div>
 
@@ -71,12 +68,5 @@ onMounted(fetchData)
   font-size: 13px;
   color: #999;
   margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
-
-.legend-red { color: #e74c3c; font-weight: 600; }
-.legend-green { color: #27ae60; font-weight: 600; }
-.legend-gray { color: #95a5a6; font-weight: 600; }
 </style>

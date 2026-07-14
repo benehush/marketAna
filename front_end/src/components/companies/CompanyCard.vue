@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import type { CompanyItem, Direction } from '../../api/types'
 import { DIRECTION_CONFIG } from '../../api/types'
+
+const INITIAL_SHOW = 8
 
 const router = useRouter()
 const props = defineProps<{
@@ -10,6 +12,14 @@ const props = defineProps<{
 }>()
 
 const expanded = ref(false)
+const showAll = ref(false)
+
+const hasMany = computed(() => props.company.predictions.length > INITIAL_SHOW)
+
+const displayedPredictions = computed(() => {
+  if (showAll.value) return props.company.predictions
+  return props.company.predictions.slice(0, INITIAL_SHOW)
+})
 
 function getDirectionInfo(direction: Direction) {
   return DIRECTION_CONFIG[direction]
@@ -24,10 +34,15 @@ function confidenceColor(confidence: number): string {
 function goToResult(resultId: number) {
   router.push({ path: `/analysis-results/${resultId}`, query: { from: 'companies' } })
 }
+
+function toggleExpand() {
+  expanded.value = !expanded.value
+  if (!expanded.value) showAll.value = false
+}
 </script>
 
 <template>
-  <div class="company-card" @click="expanded = !expanded">
+  <div class="company-card" @click="toggleExpand">
     <div class="card-header">
       <div class="company-icon">{{ company.company.slice(0, 2) }}</div>
       <div class="company-info">
@@ -40,7 +55,7 @@ function goToResult(resultId: number) {
     <Transition name="slide">
       <div v-if="expanded" class="card-body">
         <div
-          v-for="pred in company.predictions"
+          v-for="pred in displayedPredictions"
           :key="pred.result_id"
           class="prediction-row"
           @click.stop="goToResult(pred.result_id)"
@@ -61,6 +76,21 @@ function goToResult(resultId: number) {
             </span>
           </div>
         </div>
+
+        <button
+          v-if="hasMany && !showAll"
+          class="show-more-btn"
+          @click.stop="showAll = true"
+        >
+          展开全部 {{ company.predictions.length }} 条预测 ▼
+        </button>
+        <button
+          v-else-if="hasMany && showAll"
+          class="show-more-btn"
+          @click.stop="showAll = false"
+        >
+          收起至前 {{ INITIAL_SHOW }} 条 ▲
+        </button>
       </div>
     </Transition>
   </div>
@@ -168,6 +198,25 @@ function goToResult(resultId: number) {
 .pred-confidence {
   font-size: 14px;
   font-weight: 700;
+}
+
+.show-more-btn {
+  width: 100%;
+  background: #f8f9fa;
+  border: 1px dashed #ddd;
+  border-radius: 6px;
+  padding: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.show-more-btn:hover {
+  background: #f0f0f0;
+  color: #555;
+  border-color: #ccc;
 }
 
 .slide-enter-active,
